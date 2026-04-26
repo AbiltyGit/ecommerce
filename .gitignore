@@ -1,0 +1,34 @@
+# Data files (too large for git)
+data/
+
+# Report (private, submitted separately)
+report/
+
+# Python
+__pycache__/
+*.pyc
+chatbot/venv/
+report/venv/
+chatbot/.env
+
+# Java / Maven
+ecommercebackend/target/
+*.class
+
+# Angular / Node
+ecommercefrontend/node_modules/
+ecommercefrontend/.angular/
+ecommercefrontend/dist/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+test_api.js
+*.log

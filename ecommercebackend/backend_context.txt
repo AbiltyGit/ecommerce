@@ -1,0 +1,2629 @@
+--- BACKEND CONTEXT GENERATED ON Paz 26 Nis 2026 22:27:13 +03 ---
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/EcommercebackendApplication.java ---
+package com.example.ecommercebackend;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class EcommercebackendApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(EcommercebackendApplication.class, args);
+	}
+
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/model/User.java ---
+package com.example.ecommercebackend.model;
+
+import com.example.ecommercebackend.model.enums.UserRole;
+import jakarta.persistence.*;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "users")
+public class User {
+    
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    private String username;
+    private String email;
+    private String password;
+    
+    @Enumerated(EnumType.STRING)
+    private UserRole role;
+    
+    @Column(name = "created_at")
+    private LocalDateTime createdAt = LocalDateTime.now();
+
+    // Getters and Setters
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    
+    public String getUsername() { return username; }
+    public void setUsername(String username) { this.username = username; }
+    
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+    
+    public String getPassword() { return password; }
+    public void setPassword(String password) { this.password = password; }
+    
+    public UserRole getRole() { return role; }
+    public void setRole(UserRole role) { this.role = role; }
+    
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/model/Product.java ---
+package com.example.ecommercebackend.model;
+
+import jakarta.persistence.*;
+import java.math.BigDecimal;
+
+@Entity
+@Table(name = "products", indexes = { @Index(name = "idx_product_sku", columnList = "sku") })
+public class Product {
+    
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    private String sku;
+    private String name;
+    
+    @Column(length = 1000)
+    private String description;
+    private BigDecimal price;
+    
+    private Integer stockQuantity;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "store_id")
+    private Store store;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id")
+    private Category category;
+
+    // Getters and Setters
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    
+    public String getSku() { return sku; }
+    public void setSku(String sku) { this.sku = sku; }
+    
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+    
+    public BigDecimal getPrice() { return price; }
+    public void setPrice(BigDecimal price) { this.price = price; }
+    
+    public Integer getStockQuantity() { return stockQuantity; }
+    public void setStockQuantity(Integer stockQuantity) { this.stockQuantity = stockQuantity; }
+    
+    public Store getStore() { return store; }
+    public void setStore(Store store) { this.store = store; }
+    
+    public Category getCategory() { return category; }
+    public void setCategory(Category category) { this.category = category; }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/model/enums/UserRole.java ---
+package com.example.ecommercebackend.model.enums;
+
+public enum UserRole {
+    ADMIN,
+    CORPORATE,
+    INDIVIDUAL
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/model/enums/OrderStatus.java ---
+package com.example.ecommercebackend.model.enums;
+
+public enum OrderStatus {
+    PENDING,
+    PROCESSING,
+    SHIPPED,
+    DELIVERED,
+    CANCELLED
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/model/Store.java ---
+package com.example.ecommercebackend.model;
+
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "stores")
+public class Store {
+    
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    private String name;
+    private String description;
+    
+    private boolean isOpen;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "corporate_user_id")
+    private User corporateUser;
+
+    // Getters and Setters
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+    
+    public boolean isOpen() { return isOpen; }
+    public void setOpen(boolean open) { isOpen = open; }
+    
+    public User getCorporateUser() { return corporateUser; }
+    public void setCorporateUser(User corporateUser) { this.corporateUser = corporateUser; }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/model/Category.java ---
+package com.example.ecommercebackend.model;
+
+import jakarta.persistence.*;
+import java.util.List;
+
+@Entity
+@Table(name = "categories")
+public class Category {
+    
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    private String name;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_category_id")
+    private Category parentCategory;
+    
+    @OneToMany(mappedBy = "parentCategory")
+    private List<Category> subCategories;
+
+    // Getters and Setters
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    
+    public Category getParentCategory() { return parentCategory; }
+    public void setParentCategory(Category parentCategory) { this.parentCategory = parentCategory; }
+    
+    public List<Category> getSubCategories() { return subCategories; }
+    public void setSubCategories(List<Category> subCategories) { this.subCategories = subCategories; }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/model/Order.java ---
+package com.example.ecommercebackend.model;
+
+import com.example.ecommercebackend.model.enums.OrderStatus;
+import jakarta.persistence.*;
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Entity
+@Table(name = "orders", indexes = { @Index(name = "idx_order_user_id", columnList = "user_id") })
+public class Order {
+    
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
+    
+    @Column(name = "order_date")
+    private LocalDateTime orderDate = LocalDateTime.now();
+    
+    @Enumerated(EnumType.STRING)
+    private OrderStatus status;
+    
+    private String paymentMethod;
+    
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
+    private List<OrderItem> items;
+    
+    @OneToOne(mappedBy = "order", cascade = CascadeType.ALL)
+    private Shipment shipment;
+
+    // Getters and Setters
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
+    
+    public LocalDateTime getOrderDate() { return orderDate; }
+    public void setOrderDate(LocalDateTime orderDate) { this.orderDate = orderDate; }
+    
+    public OrderStatus getStatus() { return status; }
+    public void setStatus(OrderStatus status) { this.status = status; }
+    
+    public String getPaymentMethod() { return paymentMethod; }
+    public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }
+    
+    public List<OrderItem> getItems() { return items; }
+    public void setItems(List<OrderItem> items) { this.items = items; }
+    
+    public Shipment getShipment() { return shipment; }
+    public void setShipment(Shipment shipment) { this.shipment = shipment; }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/model/OrderItem.java ---
+package com.example.ecommercebackend.model;
+
+import jakarta.persistence.*;
+import java.math.BigDecimal;
+
+@Entity
+@Table(name = "order_items")
+public class OrderItem {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "order_id")
+    private Order order;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_id")
+    private Product product;
+    
+    private Integer quantity;
+    private BigDecimal unitPrice;
+
+    // Getters and Setters
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    
+    public Order getOrder() { return order; }
+    public void setOrder(Order order) { this.order = order; }
+    
+    public Product getProduct() { return product; }
+    public void setProduct(Product product) { this.product = product; }
+    
+    public Integer getQuantity() { return quantity; }
+    public void setQuantity(Integer quantity) { this.quantity = quantity; }
+    
+    public BigDecimal getUnitPrice() { return unitPrice; }
+    public void setUnitPrice(BigDecimal unitPrice) { this.unitPrice = unitPrice; }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/model/Shipment.java ---
+package com.example.ecommercebackend.model;
+
+import jakarta.persistence.*;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "shipments", indexes = { @Index(name = "idx_shipment_tracking", columnList = "tracking_number") })
+public class Shipment {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "order_id")
+    private Order order;
+
+    private String warehouseBlock;
+    private String modeOfShipment;
+    private String trackingNumber;
+    
+    @Column(name = "shipped_date")
+    private LocalDateTime shippedDate;
+
+    // Getters and Setters
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    
+    public Order getOrder() { return order; }
+    public void setOrder(Order order) { this.order = order; }
+    
+    public String getWarehouseBlock() { return warehouseBlock; }
+    public void setWarehouseBlock(String warehouseBlock) { this.warehouseBlock = warehouseBlock; }
+    
+    public String getModeOfShipment() { return modeOfShipment; }
+    public void setModeOfShipment(String modeOfShipment) { this.modeOfShipment = modeOfShipment; }
+    
+    public String getTrackingNumber() { return trackingNumber; }
+    public void setTrackingNumber(String trackingNumber) { this.trackingNumber = trackingNumber; }
+    
+    public LocalDateTime getShippedDate() { return shippedDate; }
+    public void setShippedDate(LocalDateTime shippedDate) { this.shippedDate = shippedDate; }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/model/Review.java ---
+package com.example.ecommercebackend.model;
+
+import jakarta.persistence.*;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "reviews")
+public class Review {
+    
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_id")
+    private Product product;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
+    
+    private Integer rating;
+    
+    @Column(length = 2000)
+    private String comment;
+    
+    private Integer helpfulVotes;
+    private Integer totalVotes;
+    
+    @Column(name = "created_at")
+    private LocalDateTime createdAt = LocalDateTime.now();
+
+    // Getters and Setters
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    
+    public Product getProduct() { return product; }
+    public void setProduct(Product product) { this.product = product; }
+    
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
+    
+    public Integer getRating() { return rating; }
+    public void setRating(Integer rating) { this.rating = rating; }
+    
+    public String getComment() { return comment; }
+    public void setComment(String comment) { this.comment = comment; }
+    
+    public Integer getHelpfulVotes() { return helpfulVotes; }
+    public void setHelpfulVotes(Integer helpfulVotes) { this.helpfulVotes = helpfulVotes; }
+    
+    public Integer getTotalVotes() { return totalVotes; }
+    public void setTotalVotes(Integer totalVotes) { this.totalVotes = totalVotes; }
+    
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/model/CustomerProfile.java ---
+package com.example.ecommercebackend.model;
+
+import jakarta.persistence.*;
+import java.math.BigDecimal;
+
+@Entity
+@Table(name = "customer_profiles")
+public class CustomerProfile {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
+
+    private String gender;
+    private Integer age;
+    private String city;
+    private String membershipType;
+    
+    private BigDecimal totalSpend;
+    private Integer itemsPurchased;
+    
+    private Double avgRating;
+    private Boolean discountApplied;
+    private Integer satisfactionLevel;
+
+    // Getters and Setters
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
+    
+    public String getGender() { return gender; }
+    public void setGender(String gender) { this.gender = gender; }
+    
+    public Integer getAge() { return age; }
+    public void setAge(Integer age) { this.age = age; }
+    
+    public String getCity() { return city; }
+    public void setCity(String city) { this.city = city; }
+    
+    public String getMembershipType() { return membershipType; }
+    public void setMembershipType(String membershipType) { this.membershipType = membershipType; }
+    
+    public BigDecimal getTotalSpend() { return totalSpend; }
+    public void setTotalSpend(BigDecimal totalSpend) { this.totalSpend = totalSpend; }
+    
+    public Integer getItemsPurchased() { return itemsPurchased; }
+    public void setItemsPurchased(Integer itemsPurchased) { this.itemsPurchased = itemsPurchased; }
+    
+    public Double getAvgRating() { return avgRating; }
+    public void setAvgRating(Double avgRating) { this.avgRating = avgRating; }
+    
+    public Boolean getDiscountApplied() { return discountApplied; }
+    public void setDiscountApplied(Boolean discountApplied) { this.discountApplied = discountApplied; }
+    
+    public Integer getSatisfactionLevel() { return satisfactionLevel; }
+    public void setSatisfactionLevel(Integer satisfactionLevel) { this.satisfactionLevel = satisfactionLevel; }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/model/RefreshToken.java ---
+package com.example.ecommercebackend.model;
+import jakarta.persistence.*;
+import java.time.Instant;
+@Entity
+@Table(name = "refresh_tokens")
+public class RefreshToken {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;
+    @OneToOne @JoinColumn(name = "user_id", referencedColumnName = "id") private User user;
+    @Column(nullable = false, unique = true) private String token;
+    @Column(nullable = false) private Instant expiryDate;
+    public Long getId() { return id; } public void setId(Long id) { this.id = id; }
+    public User getUser() { return user; } public void setUser(User user) { this.user = user; }
+    public String getToken() { return token; } public void setToken(String token) { this.token = token; }
+    public Instant getExpiryDate() { return expiryDate; } public void setExpiryDate(Instant expiryDate) { this.expiryDate = expiryDate; }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/repository/UserRepository.java ---
+package com.example.ecommercebackend.repository;
+
+import com.example.ecommercebackend.model.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.Optional;
+
+@Repository
+public interface UserRepository extends JpaRepository<User, Long> {
+    Optional<User> findByUsername(String username);
+    Optional<User> findByEmail(String email);
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/repository/ProductRepository.java ---
+package com.example.ecommercebackend.repository;
+
+import com.example.ecommercebackend.model.Product;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public interface ProductRepository extends JpaRepository<Product, Long> {
+    List<Product> findByStoreId(Long storeId);
+    List<Product> findByCategoryId(Long categoryId);
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/repository/OrderRepository.java ---
+package com.example.ecommercebackend.repository;
+
+import com.example.ecommercebackend.model.Order;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public interface OrderRepository extends JpaRepository<Order, Long> {
+    List<Order> findByUserId(Long userId);
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/repository/StoreRepository.java ---
+package com.example.ecommercebackend.repository;
+
+import com.example.ecommercebackend.model.Store;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public interface StoreRepository extends JpaRepository<Store, Long> {
+    List<Store> findByCorporateUserId(Long corporateUserId);
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/repository/CategoryRepository.java ---
+package com.example.ecommercebackend.repository;
+
+import com.example.ecommercebackend.model.Category;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public interface CategoryRepository extends JpaRepository<Category, Long> {
+    List<Category> findByParentCategoryIdIsNull();
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/repository/OrderItemRepository.java ---
+package com.example.ecommercebackend.repository;
+
+import com.example.ecommercebackend.model.OrderItem;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
+    List<OrderItem> findByOrderId(Long orderId);
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/repository/ShipmentRepository.java ---
+package com.example.ecommercebackend.repository;
+
+import com.example.ecommercebackend.model.Shipment;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.Optional;
+
+@Repository
+public interface ShipmentRepository extends JpaRepository<Shipment, Long> {
+    Optional<Shipment> findByTrackingNumber(String trackingNumber);
+    Optional<Shipment> findByOrderId(Long orderId);
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/repository/ReviewRepository.java ---
+package com.example.ecommercebackend.repository;
+
+import com.example.ecommercebackend.model.Review;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public interface ReviewRepository extends JpaRepository<Review, Long> {
+    List<Review> findByProductId(Long productId);
+    List<Review> findByUserId(Long userId);
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/repository/CustomerProfileRepository.java ---
+package com.example.ecommercebackend.repository;
+
+import com.example.ecommercebackend.model.CustomerProfile;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.Optional;
+
+@Repository
+public interface CustomerProfileRepository extends JpaRepository<CustomerProfile, Long> {
+    Optional<CustomerProfile> findByUserId(Long userId);
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/repository/RefreshTokenRepository.java ---
+package com.example.ecommercebackend.repository;
+import com.example.ecommercebackend.model.RefreshToken;
+import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.Optional;
+public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long> {
+    Optional<RefreshToken> findByToken(String token);
+    void deleteByUserId(Long userId);
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/service/UserService.java ---
+package com.example.ecommercebackend.service;
+import com.example.ecommercebackend.dto.request.UserRequest;
+import com.example.ecommercebackend.dto.response.UserResponse;
+import java.util.List;
+public interface UserService {
+    UserResponse createUser(UserRequest request);
+    UserResponse getUserById(Long id);
+    List<UserResponse> getAllUsers();
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/service/impl/UserServiceImpl.java ---
+package com.example.ecommercebackend.service.impl;
+import com.example.ecommercebackend.dto.request.UserRequest;
+import com.example.ecommercebackend.dto.response.UserResponse;
+import com.example.ecommercebackend.model.User;
+import com.example.ecommercebackend.repository.UserRepository;
+import com.example.ecommercebackend.service.UserService;
+import com.example.ecommercebackend.exception.ResourceNotFoundException;
+import org.springframework.stereotype.Service;
+import java.util.List;
+@Service
+public class UserServiceImpl implements UserService {
+    private final UserRepository userRepository;
+    public UserServiceImpl(UserRepository userRepository) { this.userRepository = userRepository; }
+    
+    @Override
+    public UserResponse createUser(UserRequest request) {
+        User user = new User();
+        user.setUsername(request.username());
+        user.setEmail(request.email());
+        user.setPassword(request.password());
+        user.setRole(request.role());
+        User saved = userRepository.save(user);
+        return mapToResponse(saved);
+    }
+    @Override
+    public UserResponse getUserById(Long id) {
+        User user = userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User not found: " + id));
+        return mapToResponse(user);
+    }
+    @Override
+    public List<UserResponse> getAllUsers() {
+        return userRepository.findAll().stream().map(this::mapToResponse).toList();
+    }
+    private UserResponse mapToResponse(User user) {
+        return new UserResponse(user.getId(), user.getUsername(), user.getEmail(), user.getRole(), user.getCreatedAt());
+    }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/service/impl/ProductServiceImpl.java ---
+package com.example.ecommercebackend.service.impl;
+import com.example.ecommercebackend.dto.request.ProductRequest;
+import com.example.ecommercebackend.dto.response.ProductResponse;
+import com.example.ecommercebackend.model.Product;
+import com.example.ecommercebackend.model.Store;
+import com.example.ecommercebackend.model.Category;
+import com.example.ecommercebackend.repository.ProductRepository;
+import com.example.ecommercebackend.repository.StoreRepository;
+import com.example.ecommercebackend.repository.CategoryRepository;
+import com.example.ecommercebackend.service.ProductService;
+import com.example.ecommercebackend.exception.ResourceNotFoundException;
+import org.springframework.stereotype.Service;
+import java.util.List;
+@Service
+public class ProductServiceImpl implements ProductService {
+    private final ProductRepository productRepository;
+    private final StoreRepository storeRepository;
+    private final CategoryRepository categoryRepository;
+
+    public ProductServiceImpl(ProductRepository productRepository, StoreRepository storeRepository, CategoryRepository categoryRepository) { 
+        this.productRepository = productRepository; 
+        this.storeRepository = storeRepository;
+        this.categoryRepository = categoryRepository;
+    }
+
+    @Override
+    public ProductResponse createProduct(ProductRequest request) {
+        Product product = new Product();
+        product.setSku(request.sku());
+        product.setName(request.name());
+        product.setDescription(request.description());
+        product.setPrice(request.price());
+        product.setStockQuantity(request.stockQuantity());
+        
+        if (request.storeId() != null) {
+            Store store = storeRepository.findById(request.storeId()).orElseThrow(() -> new ResourceNotFoundException("Store not found"));
+            product.setStore(store);
+        }
+        if (request.categoryId() != null) {
+            Category category = categoryRepository.findById(request.categoryId()).orElseThrow(() -> new ResourceNotFoundException("Category not found"));
+            product.setCategory(category);
+        }
+        
+        Product saved = productRepository.save(product);
+        return mapToResponse(saved);
+    }
+    @Override
+    public ProductResponse getProductById(Long id) {
+        Product product = productRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Product not found: " + id));
+        return mapToResponse(product);
+    }
+    @Override
+    public List<ProductResponse> getAllProducts() {
+        return productRepository.findAll().stream().map(this::mapToResponse).toList();
+    }
+    private ProductResponse mapToResponse(Product product) {
+        Long storeId = product.getStore() != null ? product.getStore().getId() : null;
+        Long catId = product.getCategory() != null ? product.getCategory().getId() : null;
+        return new ProductResponse(product.getId(), product.getSku(), product.getName(), product.getDescription(), product.getPrice(), product.getStockQuantity(), storeId, catId);
+    }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/service/impl/OrderServiceImpl.java ---
+package com.example.ecommercebackend.service.impl;
+import com.example.ecommercebackend.dto.request.OrderRequest;
+import com.example.ecommercebackend.dto.request.OrderItemRequest;
+import com.example.ecommercebackend.dto.response.OrderResponse;
+import com.example.ecommercebackend.model.Order;
+import com.example.ecommercebackend.model.OrderItem;
+import com.example.ecommercebackend.model.Product;
+import com.example.ecommercebackend.model.User;
+import com.example.ecommercebackend.model.enums.OrderStatus;
+import com.example.ecommercebackend.repository.OrderRepository;
+import com.example.ecommercebackend.repository.UserRepository;
+import com.example.ecommercebackend.repository.ProductRepository;
+import com.example.ecommercebackend.service.OrderService;
+import com.example.ecommercebackend.exception.ResourceNotFoundException;
+import com.example.ecommercebackend.exception.BadRequestException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import java.util.List;
+import java.util.ArrayList;
+
+@Service
+public class OrderServiceImpl implements OrderService {
+    private final OrderRepository orderRepository;
+    private final UserRepository userRepository;
+    private final ProductRepository productRepository;
+
+    public OrderServiceImpl(OrderRepository orderRepository, UserRepository userRepository, ProductRepository productRepository) { 
+        this.orderRepository = orderRepository;
+        this.userRepository = userRepository;
+        this.productRepository = productRepository;
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse createOrder(OrderRequest request) {
+        User user = userRepository.findById(request.userId()).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        
+        Order order = new Order();
+        order.setUser(user);
+        order.setPaymentMethod(request.paymentMethod());
+        order.setStatus(OrderStatus.PENDING);
+        
+        List<OrderItem> items = new ArrayList<>();
+        for(OrderItemRequest itemReq : request.items()) {
+            Product product = productRepository.findById(itemReq.productId()).orElseThrow(() -> new ResourceNotFoundException("Product not found"));
+            if(product.getStockQuantity() < itemReq.quantity()) {
+                throw new BadRequestException("Not enough stock for product: " + product.getName());
+            }
+            
+            product.setStockQuantity(product.getStockQuantity() - itemReq.quantity());
+            productRepository.save(product);
+            
+            OrderItem item = new OrderItem();
+            item.setOrder(order);
+            item.setProduct(product);
+            item.setQuantity(itemReq.quantity());
+            item.setUnitPrice(product.getPrice());
+            items.add(item);
+        }
+        order.setItems(items);
+        Order saved = orderRepository.save(order);
+        return mapToResponse(saved);
+    }
+    @Override
+    public OrderResponse getOrderById(Long id) {
+        Order order = orderRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Order not found"));
+        return mapToResponse(order);
+    }
+    @Override
+    public List<OrderResponse> getAllOrders() {
+        return orderRepository.findAll().stream().map(this::mapToResponse).toList();
+    }
+    private OrderResponse mapToResponse(Order order) {
+        return new OrderResponse(order.getId(), order.getUser().getId(), order.getOrderDate(), order.getStatus(), order.getPaymentMethod());
+    }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/service/impl/StoreServiceImpl.java ---
+package com.example.ecommercebackend.service.impl;
+import com.example.ecommercebackend.dto.request.StoreRequest;
+import com.example.ecommercebackend.dto.response.StoreResponse;
+import com.example.ecommercebackend.model.Store;
+import com.example.ecommercebackend.model.User;
+import com.example.ecommercebackend.repository.StoreRepository;
+import com.example.ecommercebackend.repository.UserRepository;
+import com.example.ecommercebackend.service.StoreService;
+import com.example.ecommercebackend.exception.ResourceNotFoundException;
+import org.springframework.stereotype.Service;
+import java.util.List;
+@Service
+public class StoreServiceImpl implements StoreService {
+    private final StoreRepository storeRepository;
+    private final UserRepository userRepository;
+    public StoreServiceImpl(StoreRepository storeRepository, UserRepository userRepository) { this.storeRepository = storeRepository; this.userRepository = userRepository; }
+    public StoreResponse createStore(StoreRequest request) {
+        Store store = new Store();
+        store.setName(request.name());
+        store.setDescription(request.description());
+        store.setOpen(true);
+        if (request.corporateUserId() != null) {
+            User user = userRepository.findById(request.corporateUserId()).orElseThrow(() -> new ResourceNotFoundException("Corporate user not found"));
+            store.setCorporateUser(user);
+        }
+        return mapToResponse(storeRepository.save(store));
+    }
+    public StoreResponse getStoreById(Long id) { return mapToResponse(storeRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Store not found"))); }
+    public List<StoreResponse> getAllStores() { return storeRepository.findAll().stream().map(this::mapToResponse).toList(); }
+    private StoreResponse mapToResponse(Store store) { return new StoreResponse(store.getId(), store.getName(), store.getDescription(), store.isOpen(), store.getCorporateUser() != null ? store.getCorporateUser().getId() : null); }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/service/impl/CategoryServiceImpl.java ---
+package com.example.ecommercebackend.service.impl;
+import com.example.ecommercebackend.dto.request.CategoryRequest;
+import com.example.ecommercebackend.dto.response.CategoryResponse;
+import com.example.ecommercebackend.model.Category;
+import com.example.ecommercebackend.repository.CategoryRepository;
+import com.example.ecommercebackend.service.CategoryService;
+import com.example.ecommercebackend.exception.ResourceNotFoundException;
+import org.springframework.stereotype.Service;
+import java.util.List;
+@Service
+public class CategoryServiceImpl implements CategoryService {
+    private final CategoryRepository categoryRepository;
+    public CategoryServiceImpl(CategoryRepository categoryRepository) { this.categoryRepository = categoryRepository; }
+    public CategoryResponse createCategory(CategoryRequest request) {
+        Category category = new Category();
+        category.setName(request.name());
+        if (request.parentCategoryId() != null) {
+            Category parent = categoryRepository.findById(request.parentCategoryId()).orElseThrow(() -> new ResourceNotFoundException("Parent category not found"));
+            category.setParentCategory(parent);
+        }
+        return mapToResponse(categoryRepository.save(category));
+    }
+    public CategoryResponse getCategoryById(Long id) { return mapToResponse(categoryRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Category not found"))); }
+    public List<CategoryResponse> getAllCategories() { return categoryRepository.findAll().stream().map(this::mapToResponse).toList(); }
+    private CategoryResponse mapToResponse(Category category) { return new CategoryResponse(category.getId(), category.getName(), category.getParentCategory() != null ? category.getParentCategory().getId() : null); }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/service/impl/ShipmentServiceImpl.java ---
+package com.example.ecommercebackend.service.impl;
+import com.example.ecommercebackend.dto.request.ShipmentRequest;
+import com.example.ecommercebackend.dto.response.ShipmentResponse;
+import com.example.ecommercebackend.model.Shipment;
+import com.example.ecommercebackend.model.Order;
+import com.example.ecommercebackend.repository.ShipmentRepository;
+import com.example.ecommercebackend.repository.OrderRepository;
+import com.example.ecommercebackend.service.ShipmentService;
+import com.example.ecommercebackend.exception.ResourceNotFoundException;
+import org.springframework.stereotype.Service;
+import java.util.List;
+import java.time.LocalDateTime;
+@Service
+public class ShipmentServiceImpl implements ShipmentService {
+    private final ShipmentRepository shipmentRepository;
+    private final OrderRepository orderRepository;
+    public ShipmentServiceImpl(ShipmentRepository shipmentRepository, OrderRepository orderRepository) { this.shipmentRepository = shipmentRepository; this.orderRepository = orderRepository; }
+    public ShipmentResponse createShipment(ShipmentRequest request) {
+        Shipment shipment = new Shipment();
+        shipment.setWarehouseBlock(request.warehouseBlock());
+        shipment.setModeOfShipment(request.modeOfShipment());
+        shipment.setTrackingNumber(request.trackingNumber());
+        shipment.setShippedDate(LocalDateTime.now());
+        if (request.orderId() != null) {
+            Order order = orderRepository.findById(request.orderId()).orElseThrow(() -> new ResourceNotFoundException("Order not found"));
+            shipment.setOrder(order);
+        }
+        return mapToResponse(shipmentRepository.save(shipment));
+    }
+    public ShipmentResponse getShipmentById(Long id) { return mapToResponse(shipmentRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Shipment not found"))); }
+    public List<ShipmentResponse> getAllShipments() { return shipmentRepository.findAll().stream().map(this::mapToResponse).toList(); }
+    private ShipmentResponse mapToResponse(Shipment shipment) { return new ShipmentResponse(shipment.getId(), shipment.getOrder() != null ? shipment.getOrder().getId() : null, shipment.getWarehouseBlock(), shipment.getModeOfShipment(), shipment.getTrackingNumber(), shipment.getShippedDate()); }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/service/impl/ReviewServiceImpl.java ---
+package com.example.ecommercebackend.service.impl;
+import com.example.ecommercebackend.dto.request.ReviewRequest;
+import com.example.ecommercebackend.dto.response.ReviewResponse;
+import com.example.ecommercebackend.model.Review;
+import com.example.ecommercebackend.model.Product;
+import com.example.ecommercebackend.model.User;
+import com.example.ecommercebackend.repository.ReviewRepository;
+import com.example.ecommercebackend.repository.ProductRepository;
+import com.example.ecommercebackend.repository.UserRepository;
+import com.example.ecommercebackend.service.ReviewService;
+import com.example.ecommercebackend.exception.ResourceNotFoundException;
+import org.springframework.stereotype.Service;
+import java.util.List;
+@Service
+public class ReviewServiceImpl implements ReviewService {
+    private final ReviewRepository reviewRepository;
+    private final ProductRepository productRepository;
+    private final UserRepository userRepository;
+    public ReviewServiceImpl(ReviewRepository reviewRepository, ProductRepository productRepository, UserRepository userRepository) { this.reviewRepository = reviewRepository; this.productRepository = productRepository; this.userRepository = userRepository; }
+    public ReviewResponse createReview(ReviewRequest request) {
+        Review review = new Review();
+        review.setRating(request.rating());
+        review.setComment(request.comment());
+        review.setHelpfulVotes(0);
+        review.setTotalVotes(0);
+        if (request.productId() != null) {
+            Product product = productRepository.findById(request.productId()).orElseThrow(() -> new ResourceNotFoundException("Product not found"));
+            review.setProduct(product);
+        }
+        if (request.userId() != null) {
+            User user = userRepository.findById(request.userId()).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+            review.setUser(user);
+        }
+        return mapToResponse(reviewRepository.save(review));
+    }
+    public ReviewResponse getReviewById(Long id) { return mapToResponse(reviewRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Review not found"))); }
+    public List<ReviewResponse> getAllReviews() { return reviewRepository.findAll().stream().map(this::mapToResponse).toList(); }
+    private ReviewResponse mapToResponse(Review review) { return new ReviewResponse(review.getId(), review.getProduct() != null ? review.getProduct().getId() : null, review.getUser() != null ? review.getUser().getId() : null, review.getRating(), review.getComment(), review.getHelpfulVotes(), review.getTotalVotes(), review.getCreatedAt()); }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/service/impl/CustomerProfileServiceImpl.java ---
+package com.example.ecommercebackend.service.impl;
+import com.example.ecommercebackend.dto.request.CustomerProfileRequest;
+import com.example.ecommercebackend.dto.response.CustomerProfileResponse;
+import com.example.ecommercebackend.model.CustomerProfile;
+import com.example.ecommercebackend.model.User;
+import com.example.ecommercebackend.repository.CustomerProfileRepository;
+import com.example.ecommercebackend.repository.UserRepository;
+import com.example.ecommercebackend.service.CustomerProfileService;
+import com.example.ecommercebackend.exception.ResourceNotFoundException;
+import org.springframework.stereotype.Service;
+import java.util.List;
+import java.math.BigDecimal;
+@Service
+public class CustomerProfileServiceImpl implements CustomerProfileService {
+    private final CustomerProfileRepository profileRepository;
+    private final UserRepository userRepository;
+    public CustomerProfileServiceImpl(CustomerProfileRepository profileRepository, UserRepository userRepository) { this.profileRepository = profileRepository; this.userRepository = userRepository; }
+    public CustomerProfileResponse createProfile(CustomerProfileRequest request) {
+        CustomerProfile profile = new CustomerProfile();
+        profile.setGender(request.gender());
+        profile.setAge(request.age());
+        profile.setCity(request.city());
+        profile.setMembershipType(request.membershipType());
+        profile.setTotalSpend(BigDecimal.ZERO);
+        profile.setItemsPurchased(0);
+        profile.setAvgRating(0.0);
+        profile.setDiscountApplied(false);
+        profile.setSatisfactionLevel(0);
+        if (request.userId() != null) {
+            User user = userRepository.findById(request.userId()).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+            profile.setUser(user);
+        }
+        return mapToResponse(profileRepository.save(profile));
+    }
+    public CustomerProfileResponse getProfileById(Long id) { return mapToResponse(profileRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Profile not found"))); }
+    public List<CustomerProfileResponse> getAllProfiles() { return profileRepository.findAll().stream().map(this::mapToResponse).toList(); }
+    private CustomerProfileResponse mapToResponse(CustomerProfile profile) { return new CustomerProfileResponse(profile.getId(), profile.getUser() != null ? profile.getUser().getId() : null, profile.getGender(), profile.getAge(), profile.getCity(), profile.getMembershipType(), profile.getTotalSpend(), profile.getItemsPurchased(), profile.getAvgRating(), profile.getDiscountApplied(), profile.getSatisfactionLevel()); }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/service/impl/QueryExecutionServiceImpl.java ---
+package com.example.ecommercebackend.service.impl;
+
+import com.example.ecommercebackend.service.QueryExecutionService;
+import com.example.ecommercebackend.exception.BadRequestException;
+import net.sf.jsqlparser.JSQLParserException;
+import net.sf.jsqlparser.parser.CCJSqlParserUtil;
+import net.sf.jsqlparser.statement.Statement;
+import net.sf.jsqlparser.statement.select.Limit;
+import net.sf.jsqlparser.statement.select.PlainSelect;
+import net.sf.jsqlparser.statement.select.Select;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Service implementation for safely executing raw SQL queries generated by the AI Chatbot.
+ * Uses JSqlParser to parse the SQL into an Abstract Syntax Tree (AST), validates it,
+ * and automatically injects a LIMIT clause to prevent Out-Of-Memory (OOM) errors.
+ */
+@Service
+public class QueryExecutionServiceImpl implements QueryExecutionService {
+
+    private final JdbcTemplate jdbcTemplate;
+
+    public QueryExecutionServiceImpl(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    /**
+     * Executes a read-only SELECT query safely.
+     *
+     * @param sql The raw SQL string generated by the AI
+     * @return List of rows represented as key-value maps
+     * @throws BadRequestException if the SQL is invalid or not a SELECT query
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> executeReadOnlyQuery(String sql) {
+        if (sql == null || sql.trim().isEmpty()) {
+            throw new BadRequestException("SQL query cannot be empty or null.");
+        }
+
+        try {
+            // 1. AST Parsing with JSqlParser
+            Statement statement = CCJSqlParserUtil.parse(sql);
+
+            // 2. Ensure it is a SELECT statement (blocks DROP, DELETE, etc.)
+            if (!(statement instanceof Select)) {
+                throw new BadRequestException("Security Violation: Only SELECT queries are allowed to be executed.");
+            }
+
+            Select selectStatement = (Select) statement;
+
+            // 3. Inject LIMIT 100 to prevent OOM
+            if (selectStatement.getSelectBody() instanceof PlainSelect) {
+                PlainSelect plainSelect = (PlainSelect) selectStatement.getSelectBody();
+                if (plainSelect.getLimit() == null) {
+                    Limit limit = new Limit();
+                    limit.setRowCount(new net.sf.jsqlparser.expression.LongValue(100));
+                    plainSelect.setLimit(limit);
+                }
+            }
+
+            // Get the safe and limited SQL
+            String safeSql = selectStatement.toString();
+
+            // 4. Execute via JdbcTemplate
+            return jdbcTemplate.queryForList(safeSql);
+
+        } catch (JSQLParserException e) {
+            // If it fails to parse, block it (prevents jailbreaking or malformed SQL injection)
+            throw new BadRequestException("Failed to parse SQL AST. Invalid syntax or unsupported query structure: " + e.getMessage());
+        }
+    }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/service/impl/ChatServiceImpl.java ---
+package com.example.ecommercebackend.service.impl;
+
+import com.example.ecommercebackend.dto.request.ChatRequest;
+import com.example.ecommercebackend.dto.response.ChatResponse;
+import com.example.ecommercebackend.service.ChatService;
+import com.example.ecommercebackend.service.QueryExecutionService;
+import com.example.ecommercebackend.security.CustomUserDetails;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Service implementation for orchestrating the AI Chatbot Text2SQL flow.
+ * Handles communication with the Python LangGraph FastAPI server.
+ */
+@Service
+public class ChatServiceImpl implements ChatService {
+
+    private final QueryExecutionService queryExecutionService;
+    private final RestTemplate restTemplate;
+
+    @Value("${ai.chatbot.url:http://localhost:8000}")
+    private String chatbotBaseUrl;
+
+    public ChatServiceImpl(QueryExecutionService queryExecutionService, RestTemplate restTemplate) {
+        this.queryExecutionService = queryExecutionService;
+        this.restTemplate = restTemplate;
+    }
+
+    /**
+     * Processes a user question by sending it to the AI, executing the generated SQL safely,
+     * and sending the results back to the AI for natural language analysis and visualization.
+     *
+     * @param request The chat request containing the user's natural language question
+     * @return ChatResponse containing the AI's answer, raw data, and visualization code
+     */
+    @Override
+    @SuppressWarnings("unchecked")
+    public ChatResponse askQuestion(ChatRequest request) {
+        CustomUserDetails userDetails = (CustomUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Long userId = userDetails.getUser().getId();
+        String role = userDetails.getUser().getRole().name();
+
+        // 1. Ask for SQL
+        Map<String, Object> askPayload = new HashMap<>();
+        askPayload.put("question", request.getQuestion());
+        askPayload.put("user_id", userId);
+        askPayload.put("role", role);
+        askPayload.put("chat_history", request.getChatHistory());
+
+        Map<String, Object> askResponse;
+        try {
+            askResponse = restTemplate.postForObject(chatbotBaseUrl + "/ask", askPayload, Map.class);
+        } catch (Exception e) {
+            return createFallbackResponse("Failed to connect to Python AI Ask Endpoint (/ask): " + e.getMessage());
+        }
+
+        if (askResponse == null) return createFallbackResponse("Received null response from Python AI Ask Endpoint.");
+
+        String sqlQuery = (String) askResponse.get("sql_query");
+        String answer = (String) askResponse.get("answer");
+        
+        if (sqlQuery == null || sqlQuery.trim().isEmpty()) {
+            return createFallbackResponse(answer);
+        }
+
+        List<Map<String, Object>> data = null;
+
+        // 2. Execute SQL with Retry via Error Agent
+        try {
+            data = queryExecutionService.executeReadOnlyQuery(sqlQuery);
+        } catch (Exception e) {
+            Map<String, Object> fixPayload = new HashMap<>();
+            fixPayload.put("bad_sql", sqlQuery);
+            fixPayload.put("error", e.getMessage());
+
+            try {
+                Map<String, Object> fixResponse = restTemplate.postForObject(chatbotBaseUrl + "/fix_sql", fixPayload, Map.class);
+                if (fixResponse != null && fixResponse.get("sql_query") != null) {
+                    sqlQuery = (String) fixResponse.get("sql_query");
+                    // 2nd Try
+                    data = queryExecutionService.executeReadOnlyQuery(sqlQuery);
+                } else {
+                    return createFallbackResponse("Database execution failed and AI Error Agent was unable to fix the SQL syntax.");
+                }
+            } catch (Exception ex) {
+                return createFallbackResponse("Database execution failed again after AI retry attempt: " + ex.getMessage());
+            }
+        }
+
+        // 3. Analyze Data
+        Map<String, Object> analyzePayload = new HashMap<>();
+        analyzePayload.put("question", request.getQuestion());
+        analyzePayload.put("data", data);
+
+        String visualizationCode = null;
+
+        try {
+            Map<String, Object> analyzeResponse = restTemplate.postForObject(chatbotBaseUrl + "/analyze", analyzePayload, Map.class);
+            if (analyzeResponse != null) {
+                answer = (String) analyzeResponse.get("answer");
+                visualizationCode = (String) analyzeResponse.get("visualization_code");
+            }
+        } catch (Exception e) {
+            answer = "Data retrieved successfully, but Python Analysis Endpoint (/analyze) failed: " + e.getMessage();
+        }
+
+        ChatResponse finalResponse = new ChatResponse(answer, data);
+        finalResponse.setVisualizationCode(visualizationCode);
+        return finalResponse;
+    }
+
+    private ChatResponse createFallbackResponse(String answer) {
+        return new ChatResponse(answer, null);
+    }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/service/ProductService.java ---
+package com.example.ecommercebackend.service;
+import com.example.ecommercebackend.dto.request.ProductRequest;
+import com.example.ecommercebackend.dto.response.ProductResponse;
+import java.util.List;
+public interface ProductService {
+    ProductResponse createProduct(ProductRequest request);
+    ProductResponse getProductById(Long id);
+    List<ProductResponse> getAllProducts();
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/service/OrderService.java ---
+package com.example.ecommercebackend.service;
+import com.example.ecommercebackend.dto.request.OrderRequest;
+import com.example.ecommercebackend.dto.response.OrderResponse;
+import java.util.List;
+public interface OrderService {
+    OrderResponse createOrder(OrderRequest request);
+    OrderResponse getOrderById(Long id);
+    List<OrderResponse> getAllOrders();
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/service/StoreService.java ---
+package com.example.ecommercebackend.service;
+import com.example.ecommercebackend.dto.request.StoreRequest;
+import com.example.ecommercebackend.dto.response.StoreResponse;
+import java.util.List;
+public interface StoreService {
+    StoreResponse createStore(StoreRequest request);
+    StoreResponse getStoreById(Long id);
+    List<StoreResponse> getAllStores();
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/service/CategoryService.java ---
+package com.example.ecommercebackend.service;
+import com.example.ecommercebackend.dto.request.CategoryRequest;
+import com.example.ecommercebackend.dto.response.CategoryResponse;
+import java.util.List;
+public interface CategoryService {
+    CategoryResponse createCategory(CategoryRequest request);
+    CategoryResponse getCategoryById(Long id);
+    List<CategoryResponse> getAllCategories();
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/service/ShipmentService.java ---
+package com.example.ecommercebackend.service;
+import com.example.ecommercebackend.dto.request.ShipmentRequest;
+import com.example.ecommercebackend.dto.response.ShipmentResponse;
+import java.util.List;
+public interface ShipmentService {
+    ShipmentResponse createShipment(ShipmentRequest request);
+    ShipmentResponse getShipmentById(Long id);
+    List<ShipmentResponse> getAllShipments();
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/service/ReviewService.java ---
+package com.example.ecommercebackend.service;
+import com.example.ecommercebackend.dto.request.ReviewRequest;
+import com.example.ecommercebackend.dto.response.ReviewResponse;
+import java.util.List;
+public interface ReviewService {
+    ReviewResponse createReview(ReviewRequest request);
+    ReviewResponse getReviewById(Long id);
+    List<ReviewResponse> getAllReviews();
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/service/CustomerProfileService.java ---
+package com.example.ecommercebackend.service;
+import com.example.ecommercebackend.dto.request.CustomerProfileRequest;
+import com.example.ecommercebackend.dto.response.CustomerProfileResponse;
+import java.util.List;
+public interface CustomerProfileService {
+    CustomerProfileResponse createProfile(CustomerProfileRequest request);
+    CustomerProfileResponse getProfileById(Long id);
+    List<CustomerProfileResponse> getAllProfiles();
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/service/RefreshTokenService.java ---
+package com.example.ecommercebackend.service;
+import com.example.ecommercebackend.model.RefreshToken;
+import com.example.ecommercebackend.repository.RefreshTokenRepository;
+import com.example.ecommercebackend.repository.UserRepository;
+import com.example.ecommercebackend.exception.ResourceNotFoundException;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import java.time.Instant;
+import java.util.Optional;
+import java.util.UUID;
+@Service
+public class RefreshTokenService {
+    @Value("${jwt.refreshExpirationMs:2592000000}")
+    private Long refreshTokenDurationMs;
+    private final RefreshTokenRepository refreshTokenRepository;
+    private final UserRepository userRepository;
+    public RefreshTokenService(RefreshTokenRepository refreshTokenRepository, UserRepository userRepository) {
+        this.refreshTokenRepository = refreshTokenRepository; this.userRepository = userRepository;
+    }
+    public Optional<RefreshToken> findByToken(String token) { return refreshTokenRepository.findByToken(token); }
+    public RefreshToken createRefreshToken(Long userId) {
+        RefreshToken refreshToken = new RefreshToken();
+        refreshToken.setUser(userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found")));
+        refreshToken.setExpiryDate(Instant.now().plusMillis(refreshTokenDurationMs));
+        refreshToken.setToken(UUID.randomUUID().toString());
+        return refreshTokenRepository.save(refreshToken);
+    }
+    public RefreshToken verifyExpiration(RefreshToken token) {
+        if (token.getExpiryDate().compareTo(Instant.now()) < 0) {
+            refreshTokenRepository.delete(token);
+            throw new RuntimeException("Refresh token was expired. Please make a new signin request");
+        }
+        return token;
+    }
+    @Transactional
+    public void deleteByUserId(Long userId) { refreshTokenRepository.deleteByUserId(userId); }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/service/QueryExecutionService.java ---
+package com.example.ecommercebackend.service;
+
+import java.util.List;
+import java.util.Map;
+
+public interface QueryExecutionService {
+    List<Map<String, Object>> executeReadOnlyQuery(String sql);
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/service/ChatService.java ---
+package com.example.ecommercebackend.service;
+
+import com.example.ecommercebackend.dto.request.ChatRequest;
+import com.example.ecommercebackend.dto.response.ChatResponse;
+
+public interface ChatService {
+    ChatResponse askQuestion(ChatRequest request);
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/controller/ProductController.java ---
+package com.example.ecommercebackend.controller;
+import com.example.ecommercebackend.dto.request.ProductRequest;
+import com.example.ecommercebackend.dto.response.ProductResponse;
+import com.example.ecommercebackend.service.ProductService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/products")
+public class ProductController {
+    private final ProductService productService;
+    public ProductController(ProductService productService) { this.productService = productService; }
+
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
+    @PostMapping
+    public ResponseEntity<ProductResponse> createProduct(@RequestBody ProductRequest request) {
+        return new ResponseEntity<>(productService.createProduct(request), HttpStatus.CREATED);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<ProductResponse> getProductById(@PathVariable Long id) {
+        return ResponseEntity.ok(productService.getProductById(id));
+    }
+
+    @GetMapping
+    public ResponseEntity<List<ProductResponse>> getAllProducts() {
+        return ResponseEntity.ok(productService.getAllProducts());
+    }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/controller/UserController.java ---
+package com.example.ecommercebackend.controller;
+import com.example.ecommercebackend.dto.request.UserRequest;
+import com.example.ecommercebackend.dto.response.UserResponse;
+import com.example.ecommercebackend.service.UserService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/users")
+public class UserController {
+    private final UserService userService;
+    public UserController(UserService userService) { this.userService = userService; }
+
+    @PostMapping
+    public ResponseEntity<UserResponse> createUser(@RequestBody UserRequest request) {
+        return new ResponseEntity<>(userService.createUser(request), HttpStatus.CREATED);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<UserResponse> getUserById(@PathVariable Long id) {
+        return ResponseEntity.ok(userService.getUserById(id));
+    }
+
+    @GetMapping
+    public ResponseEntity<List<UserResponse>> getAllUsers() {
+        return ResponseEntity.ok(userService.getAllUsers());
+    }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/controller/OrderController.java ---
+package com.example.ecommercebackend.controller;
+import com.example.ecommercebackend.dto.request.OrderRequest;
+import com.example.ecommercebackend.dto.response.OrderResponse;
+import com.example.ecommercebackend.service.OrderService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/orders")
+public class OrderController {
+    private final OrderService orderService;
+    public OrderController(OrderService orderService) { this.orderService = orderService; }
+
+    @PostMapping
+    public ResponseEntity<OrderResponse> createOrder(@RequestBody OrderRequest request) {
+        return new ResponseEntity<>(orderService.createOrder(request), HttpStatus.CREATED);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<OrderResponse> getOrderById(@PathVariable Long id) {
+        return ResponseEntity.ok(orderService.getOrderById(id));
+    }
+
+    @GetMapping
+    public ResponseEntity<List<OrderResponse>> getAllOrders() {
+        return ResponseEntity.ok(orderService.getAllOrders());
+    }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/controller/StoreController.java ---
+package com.example.ecommercebackend.controller;
+import com.example.ecommercebackend.dto.request.StoreRequest;
+import com.example.ecommercebackend.dto.response.StoreResponse;
+import com.example.ecommercebackend.service.StoreService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/stores")
+public class StoreController {
+    private final StoreService storeService;
+    public StoreController(StoreService storeService) { this.storeService = storeService; }
+    @PostMapping
+    public ResponseEntity<StoreResponse> createStore(@RequestBody StoreRequest request) { return new ResponseEntity<>(storeService.createStore(request), HttpStatus.CREATED); }
+    @GetMapping("/{id}")
+    public ResponseEntity<StoreResponse> getStoreById(@PathVariable Long id) { return ResponseEntity.ok(storeService.getStoreById(id)); }
+    @GetMapping
+    public ResponseEntity<List<StoreResponse>> getAllStores() { return ResponseEntity.ok(storeService.getAllStores()); }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/controller/CategoryController.java ---
+package com.example.ecommercebackend.controller;
+import com.example.ecommercebackend.dto.request.CategoryRequest;
+import com.example.ecommercebackend.dto.response.CategoryResponse;
+import com.example.ecommercebackend.service.CategoryService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/categories")
+public class CategoryController {
+    private final CategoryService categoryService;
+    public CategoryController(CategoryService categoryService) { this.categoryService = categoryService; }
+    @PostMapping
+    public ResponseEntity<CategoryResponse> createCategory(@RequestBody CategoryRequest request) { return new ResponseEntity<>(categoryService.createCategory(request), HttpStatus.CREATED); }
+    @GetMapping("/{id}")
+    public ResponseEntity<CategoryResponse> getCategoryById(@PathVariable Long id) { return ResponseEntity.ok(categoryService.getCategoryById(id)); }
+    @GetMapping
+    public ResponseEntity<List<CategoryResponse>> getAllCategories() { return ResponseEntity.ok(categoryService.getAllCategories()); }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/controller/ShipmentController.java ---
+package com.example.ecommercebackend.controller;
+import com.example.ecommercebackend.dto.request.ShipmentRequest;
+import com.example.ecommercebackend.dto.response.ShipmentResponse;
+import com.example.ecommercebackend.service.ShipmentService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/shipments")
+public class ShipmentController {
+    private final ShipmentService shipmentService;
+    public ShipmentController(ShipmentService shipmentService) { this.shipmentService = shipmentService; }
+    @PostMapping
+    public ResponseEntity<ShipmentResponse> createShipment(@RequestBody ShipmentRequest request) { return new ResponseEntity<>(shipmentService.createShipment(request), HttpStatus.CREATED); }
+    @GetMapping("/{id}")
+    public ResponseEntity<ShipmentResponse> getShipmentById(@PathVariable Long id) { return ResponseEntity.ok(shipmentService.getShipmentById(id)); }
+    @GetMapping
+    public ResponseEntity<List<ShipmentResponse>> getAllShipments() { return ResponseEntity.ok(shipmentService.getAllShipments()); }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/controller/ReviewController.java ---
+package com.example.ecommercebackend.controller;
+import com.example.ecommercebackend.dto.request.ReviewRequest;
+import com.example.ecommercebackend.dto.response.ReviewResponse;
+import com.example.ecommercebackend.service.ReviewService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/reviews")
+public class ReviewController {
+    private final ReviewService reviewService;
+    public ReviewController(ReviewService reviewService) { this.reviewService = reviewService; }
+    @PostMapping
+    public ResponseEntity<ReviewResponse> createReview(@RequestBody ReviewRequest request) { return new ResponseEntity<>(reviewService.createReview(request), HttpStatus.CREATED); }
+    @GetMapping("/{id}")
+    public ResponseEntity<ReviewResponse> getReviewById(@PathVariable Long id) { return ResponseEntity.ok(reviewService.getReviewById(id)); }
+    @GetMapping
+    public ResponseEntity<List<ReviewResponse>> getAllReviews() { return ResponseEntity.ok(reviewService.getAllReviews()); }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/controller/CustomerProfileController.java ---
+package com.example.ecommercebackend.controller;
+import com.example.ecommercebackend.dto.request.CustomerProfileRequest;
+import com.example.ecommercebackend.dto.response.CustomerProfileResponse;
+import com.example.ecommercebackend.service.CustomerProfileService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/profiles")
+public class CustomerProfileController {
+    private final CustomerProfileService profileService;
+    public CustomerProfileController(CustomerProfileService profileService) { this.profileService = profileService; }
+    @PostMapping
+    public ResponseEntity<CustomerProfileResponse> createProfile(@RequestBody CustomerProfileRequest request) { return new ResponseEntity<>(profileService.createProfile(request), HttpStatus.CREATED); }
+    @GetMapping("/{id}")
+    public ResponseEntity<CustomerProfileResponse> getProfileById(@PathVariable Long id) { return ResponseEntity.ok(profileService.getProfileById(id)); }
+    @GetMapping
+    public ResponseEntity<List<CustomerProfileResponse>> getAllProfiles() { return ResponseEntity.ok(profileService.getAllProfiles()); }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/controller/AuthController.java ---
+package com.example.ecommercebackend.controller;
+import com.example.ecommercebackend.dto.request.LoginRequest;
+import com.example.ecommercebackend.dto.request.RegisterRequest;
+import com.example.ecommercebackend.dto.request.TokenRefreshRequest;
+import com.example.ecommercebackend.dto.response.JwtResponse;
+import com.example.ecommercebackend.dto.response.TokenRefreshResponse;
+import com.example.ecommercebackend.model.RefreshToken;
+import com.example.ecommercebackend.model.User;
+import com.example.ecommercebackend.repository.UserRepository;
+import com.example.ecommercebackend.security.CustomUserDetails;
+import com.example.ecommercebackend.security.JwtService;
+import com.example.ecommercebackend.service.RefreshTokenService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/auth")
+public class AuthController {
+    private final AuthenticationManager authenticationManager;
+    private final UserRepository userRepository;
+    private final PasswordEncoder encoder;
+    private final JwtService jwtService;
+    private final RefreshTokenService refreshTokenService;
+
+    public AuthController(AuthenticationManager authenticationManager, UserRepository userRepository, PasswordEncoder encoder, JwtService jwtService, RefreshTokenService refreshTokenService) {
+        this.authenticationManager = authenticationManager; this.userRepository = userRepository; this.encoder = encoder; this.jwtService = jwtService; this.refreshTokenService = refreshTokenService;
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<?> authenticateUser(@RequestBody LoginRequest loginRequest) {
+        Authentication authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(loginRequest.username(), loginRequest.password()));
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+        CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+        String jwt = jwtService.generateJwtToken(authentication);
+        List<String> roles = userDetails.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList();
+        RefreshToken refreshToken = refreshTokenService.createRefreshToken(userDetails.getUser().getId());
+        return ResponseEntity.ok(new JwtResponse(jwt, refreshToken.getToken(), userDetails.getUser().getId(), userDetails.getUsername(), userDetails.getUser().getEmail(), roles));
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<?> registerUser(@RequestBody RegisterRequest signUpRequest) {
+        if (userRepository.findByUsername(signUpRequest.username()).isPresent()) {
+            return ResponseEntity.badRequest().body("Error: Username is already taken!");
+        }
+        if (userRepository.findByEmail(signUpRequest.email()).isPresent()) {
+            return ResponseEntity.badRequest().body("Error: Email is already in use!");
+        }
+        User user = new User();
+        user.setUsername(signUpRequest.username());
+        user.setEmail(signUpRequest.email());
+        user.setPassword(encoder.encode(signUpRequest.password()));
+        user.setRole(signUpRequest.role());
+        userRepository.save(user);
+        return ResponseEntity.ok("User registered successfully!");
+    }
+
+    @PostMapping("/refreshtoken")
+    public ResponseEntity<?> refreshtoken(@RequestBody TokenRefreshRequest request) {
+        String requestRefreshToken = request.refreshToken();
+        return refreshTokenService.findByToken(requestRefreshToken)
+            .map(refreshTokenService::verifyExpiration)
+            .map(RefreshToken::getUser)
+            .map(user -> {
+                String token = jwtService.generateJwtToken(new UsernamePasswordAuthenticationToken(new CustomUserDetails(user), null, new CustomUserDetails(user).getAuthorities()));
+                return ResponseEntity.ok(new TokenRefreshResponse(token, requestRefreshToken));
+            })
+            .orElseThrow(() -> new RuntimeException("Refresh token is not in database!"));
+    }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/controller/ChatController.java ---
+package com.example.ecommercebackend.controller;
+
+import com.example.ecommercebackend.dto.request.ChatRequest;
+import com.example.ecommercebackend.dto.response.ChatResponse;
+import com.example.ecommercebackend.service.ChatService;
+import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/chat")
+public class ChatController {
+
+    private final ChatService chatService;
+
+    public ChatController(ChatService chatService) {
+        this.chatService = chatService;
+    }
+
+    @PostMapping("/ask")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ChatResponse> askQuestion(@Valid @RequestBody ChatRequest request) {
+        ChatResponse response = chatService.askQuestion(request);
+        return ResponseEntity.ok(response);
+    }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/config/OpenApiConfig.java ---
+package com.example.ecommercebackend.config;
+
+import io.swagger.v3.oas.models.Components;
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Contact;
+import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.security.SecurityScheme;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class OpenApiConfig {
+
+    @Bean
+    public OpenAPI customOpenAPI() {
+        final String securitySchemeName = "bearerAuth";
+
+        return new OpenAPI()
+                .info(new Info()
+                        .title("E-Commerce Analytics Platform API")
+                        .version("1.0")
+                        .description("REST API documentation for the E-Commerce Analytics Platform with Multi-Agent Text2SQL AI Chatbot.")
+                        .contact(new Contact().name("Development Team")))
+                .addSecurityItem(new SecurityRequirement().addList(securitySchemeName))
+                .components(new Components()
+                        .addSecuritySchemes(securitySchemeName, new SecurityScheme()
+                                .name(securitySchemeName)
+                                .type(SecurityScheme.Type.HTTP)
+                                .scheme("bearer")
+                                .bearerFormat("JWT")));
+    }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/config/SecurityConfig.java ---
+package com.example.ecommercebackend.config;
+import com.example.ecommercebackend.security.CustomUserDetailsService;
+import com.example.ecommercebackend.security.JwtAuthenticationFilter;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+@Configuration
+@EnableMethodSecurity
+public class SecurityConfig {
+    private final CustomUserDetailsService userDetailsService;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    public SecurityConfig(CustomUserDetailsService userDetailsService, JwtAuthenticationFilter jwtAuthenticationFilter) {
+        this.userDetailsService = userDetailsService;
+        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+    }
+    @Bean
+    public DaoAuthenticationProvider authenticationProvider() {
+        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider(userDetailsService);
+        authProvider.setPasswordEncoder(passwordEncoder());
+        return authProvider;
+    }
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration authConfig) throws Exception {
+        return authConfig.getAuthenticationManager();
+    }
+    @Bean
+    public PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http.csrf(AbstractHttpConfigurer::disable)
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/products/**").permitAll()
+                .anyRequest().authenticated()
+            );
+        http.authenticationProvider(authenticationProvider());
+        http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+        return http.build();
+    }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/config/RestTemplateConfig.java ---
+package com.example.ecommercebackend.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.client.RestTemplate;
+
+@Configuration
+public class RestTemplateConfig {
+
+    @Bean
+    public RestTemplate restTemplate() {
+        return new RestTemplate();
+    }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/config/DataSeeder.java ---
+package com.example.ecommercebackend.config;
+
+import com.example.ecommercebackend.model.User;
+import com.example.ecommercebackend.model.enums.UserRole;
+import com.example.ecommercebackend.repository.UserRepository;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Component;
+
+@Component
+public class DataSeeder implements CommandLineRunner {
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    public DataSeeder(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+    }
+
+    @Override
+    public void run(String... args) throws Exception {
+        if (userRepository.count() == 0) {
+            User admin = new User();
+            admin.setUsername("admin");
+            admin.setPassword(passwordEncoder.encode("admin"));
+            admin.setEmail("admin@example.com");
+            admin.setRole(UserRole.ADMIN);
+            userRepository.save(admin);
+            System.out.println("Mock Admin user created: admin / admin");
+        }
+    }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/exception/ResourceNotFoundException.java ---
+package com.example.ecommercebackend.exception;
+public class ResourceNotFoundException extends RuntimeException {
+    public ResourceNotFoundException(String message) { super(message); }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/exception/BadRequestException.java ---
+package com.example.ecommercebackend.exception;
+public class BadRequestException extends RuntimeException {
+    public BadRequestException(String message) { super(message); }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/exception/GlobalExceptionHandler.java ---
+package com.example.ecommercebackend.exception;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<String> handleNotFound(ResourceNotFoundException ex) {
+        return new ResponseEntity<>(ex.getMessage(), HttpStatus.NOT_FOUND);
+    }
+    @ExceptionHandler(BadRequestException.class)
+    public ResponseEntity<String> handleBadRequest(BadRequestException ex) {
+        return new ResponseEntity<>(ex.getMessage(), HttpStatus.BAD_REQUEST);
+    }
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<String> handleGeneral(Exception ex) {
+        return new ResponseEntity<>(ex.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/dto/request/UserRequest.java ---
+package com.example.ecommercebackend.dto.request;
+import com.example.ecommercebackend.model.enums.UserRole;
+public record UserRequest(String username, String email, String password, UserRole role) {}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/dto/request/ProductRequest.java ---
+package com.example.ecommercebackend.dto.request;
+import java.math.BigDecimal;
+public record ProductRequest(String sku, String name, String description, BigDecimal price, Integer stockQuantity, Long storeId, Long categoryId) {}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/dto/request/OrderItemRequest.java ---
+package com.example.ecommercebackend.dto.request;
+public record OrderItemRequest(Long productId, Integer quantity) {}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/dto/request/OrderRequest.java ---
+package com.example.ecommercebackend.dto.request;
+import java.util.List;
+public record OrderRequest(Long userId, String paymentMethod, List<OrderItemRequest> items) {}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/dto/request/StoreRequest.java ---
+package com.example.ecommercebackend.dto.request;
+public record StoreRequest(String name, String description, Long corporateUserId) {}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/dto/request/CategoryRequest.java ---
+package com.example.ecommercebackend.dto.request;
+public record CategoryRequest(String name, Long parentCategoryId) {}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/dto/request/ShipmentRequest.java ---
+package com.example.ecommercebackend.dto.request;
+public record ShipmentRequest(Long orderId, String warehouseBlock, String modeOfShipment, String trackingNumber) {}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/dto/request/ReviewRequest.java ---
+package com.example.ecommercebackend.dto.request;
+public record ReviewRequest(Long productId, Long userId, Integer rating, String comment) {}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/dto/request/CustomerProfileRequest.java ---
+package com.example.ecommercebackend.dto.request;
+public record CustomerProfileRequest(Long userId, String gender, Integer age, String city, String membershipType) {}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/dto/request/LoginRequest.java ---
+package com.example.ecommercebackend.dto.request;
+public record LoginRequest(String username, String password) {}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/dto/request/RegisterRequest.java ---
+package com.example.ecommercebackend.dto.request;
+import com.example.ecommercebackend.model.enums.UserRole;
+public record RegisterRequest(String username, String email, String password, UserRole role) {}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/dto/request/TokenRefreshRequest.java ---
+package com.example.ecommercebackend.dto.request;
+public record TokenRefreshRequest(String refreshToken) {}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/dto/request/ChatRequest.java ---
+package com.example.ecommercebackend.dto.request;
+
+import jakarta.validation.constraints.NotBlank;
+import java.util.List;
+import java.util.Map;
+
+public class ChatRequest {
+    
+    @NotBlank(message = "Question cannot be empty")
+    private String question;
+    
+    private List<Map<String, String>> chatHistory;
+
+    public ChatRequest() {
+    }
+
+    public ChatRequest(String question) {
+        this.question = question;
+    }
+
+    public String getQuestion() {
+        return question;
+    }
+
+    public void setQuestion(String question) {
+        this.question = question;
+    }
+
+    public List<Map<String, String>> getChatHistory() {
+        return chatHistory;
+    }
+
+    public void setChatHistory(List<Map<String, String>> chatHistory) {
+        this.chatHistory = chatHistory;
+    }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/dto/response/UserResponse.java ---
+package com.example.ecommercebackend.dto.response;
+import com.example.ecommercebackend.model.enums.UserRole;
+import java.time.LocalDateTime;
+public record UserResponse(Long id, String username, String email, UserRole role, LocalDateTime createdAt) {}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/dto/response/ProductResponse.java ---
+package com.example.ecommercebackend.dto.response;
+import java.math.BigDecimal;
+public record ProductResponse(Long id, String sku, String name, String description, BigDecimal price, Integer stockQuantity, Long storeId, Long categoryId) {}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/dto/response/OrderResponse.java ---
+package com.example.ecommercebackend.dto.response;
+import com.example.ecommercebackend.model.enums.OrderStatus;
+import java.time.LocalDateTime;
+public record OrderResponse(Long id, Long userId, LocalDateTime orderDate, OrderStatus status, String paymentMethod) {}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/dto/response/StoreResponse.java ---
+package com.example.ecommercebackend.dto.response;
+public record StoreResponse(Long id, String name, String description, boolean isOpen, Long corporateUserId) {}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/dto/response/CategoryResponse.java ---
+package com.example.ecommercebackend.dto.response;
+public record CategoryResponse(Long id, String name, Long parentCategoryId) {}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/dto/response/ShipmentResponse.java ---
+package com.example.ecommercebackend.dto.response;
+import java.time.LocalDateTime;
+public record ShipmentResponse(Long id, Long orderId, String warehouseBlock, String modeOfShipment, String trackingNumber, LocalDateTime shippedDate) {}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/dto/response/ReviewResponse.java ---
+package com.example.ecommercebackend.dto.response;
+import java.time.LocalDateTime;
+public record ReviewResponse(Long id, Long productId, Long userId, Integer rating, String comment, Integer helpfulVotes, Integer totalVotes, LocalDateTime createdAt) {}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/dto/response/CustomerProfileResponse.java ---
+package com.example.ecommercebackend.dto.response;
+import java.math.BigDecimal;
+public record CustomerProfileResponse(Long id, Long userId, String gender, Integer age, String city, String membershipType, BigDecimal totalSpend, Integer itemsPurchased, Double avgRating, Boolean discountApplied, Integer satisfactionLevel) {}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/dto/response/JwtResponse.java ---
+package com.example.ecommercebackend.dto.response;
+import java.util.List;
+public record JwtResponse(String token, String refreshToken, Long id, String username, String email, List<String> roles) {}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/dto/response/TokenRefreshResponse.java ---
+package com.example.ecommercebackend.dto.response;
+public record TokenRefreshResponse(String accessToken, String refreshToken) {}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/dto/response/ChatResponse.java ---
+package com.example.ecommercebackend.dto.response;
+
+import java.util.List;
+import java.util.Map;
+
+public class ChatResponse {
+    
+    private String answer;
+    private List<Map<String, Object>> data;
+    private String visualizationCode;
+
+    public ChatResponse() {
+    }
+
+    public ChatResponse(String answer, List<Map<String, Object>> data) {
+        this.answer = answer;
+        this.data = data;
+    }
+
+    public String getAnswer() {
+        return answer;
+    }
+
+    public void setAnswer(String answer) {
+        this.answer = answer;
+    }
+
+    public List<Map<String, Object>> getData() {
+        return data;
+    }
+
+    public void setData(List<Map<String, Object>> data) {
+        this.data = data;
+    }
+
+    public String getVisualizationCode() {
+        return visualizationCode;
+    }
+
+    public void setVisualizationCode(String visualizationCode) {
+        this.visualizationCode = visualizationCode;
+    }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/security/CustomUserDetails.java ---
+package com.example.ecommercebackend.security;
+import com.example.ecommercebackend.model.User;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+import java.util.Collection;
+import java.util.List;
+public class CustomUserDetails implements UserDetails {
+    private final User user;
+    public CustomUserDetails(User user) { this.user = user; }
+    @Override public Collection<? extends GrantedAuthority> getAuthorities() { return List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name())); }
+    @Override public String getPassword() { return user.getPassword(); }
+    @Override public String getUsername() { return user.getUsername(); }
+    @Override public boolean isAccountNonExpired() { return true; }
+    @Override public boolean isAccountNonLocked() { return true; }
+    @Override public boolean isCredentialsNonExpired() { return true; }
+    @Override public boolean isEnabled() { return true; }
+    public User getUser() { return user; }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/security/CustomUserDetailsService.java ---
+package com.example.ecommercebackend.security;
+import com.example.ecommercebackend.repository.UserRepository;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.stereotype.Service;
+@Service
+public class CustomUserDetailsService implements UserDetailsService {
+    private final UserRepository userRepository;
+    public CustomUserDetailsService(UserRepository userRepository) { this.userRepository = userRepository; }
+    @Override public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        return userRepository.findByUsername(username)
+            .map(CustomUserDetails::new)
+            .orElseThrow(() -> new UsernameNotFoundException("User Not Found with username: " + username));
+    }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/security/JwtService.java ---
+package com.example.ecommercebackend.security;
+import io.jsonwebtoken.*;
+import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.Authentication;
+import org.springframework.stereotype.Component;
+import java.security.Key;
+import java.util.Date;
+@Component
+public class JwtService {
+    @Value("${jwt.secret:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}")
+    private String jwtSecret;
+    @Value("${jwt.expirationMs:86400000}")
+    private int jwtExpirationMs;
+
+    private Key key() { return Keys.hmacShaKeyFor(jwtSecret.getBytes()); }
+
+    public String generateJwtToken(Authentication authentication) {
+        CustomUserDetails userPrincipal = (CustomUserDetails) authentication.getPrincipal();
+        return Jwts.builder().setSubject(userPrincipal.getUsername()).setIssuedAt(new Date()).setExpiration(new Date((new Date()).getTime() + jwtExpirationMs))
+            .signWith(key(), SignatureAlgorithm.HS256)
+            .compact();
+    }
+    public String getUserNameFromJwtToken(String token) {
+        return Jwts.parserBuilder().setSigningKey(key()).build().parseClaimsJws(token).getBody().getSubject();
+    }
+    public boolean validateJwtToken(String authToken) {
+        try {
+            Jwts.parserBuilder().setSigningKey(key()).build().parseClaimsJws(authToken);
+            return true;
+        } catch (JwtException | IllegalArgumentException e) {
+            System.err.println("Invalid JWT token: " + e.getMessage());
+        }
+        return false;
+    }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/security/JwtAuthenticationFilter.java ---
+package com.example.ecommercebackend.security;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+import org.springframework.web.filter.OncePerRequestFilter;
+import java.io.IOException;
+@Component
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
+    private final JwtService jwtService;
+    private final CustomUserDetailsService userDetailsService;
+    public JwtAuthenticationFilter(JwtService jwtService, CustomUserDetailsService userDetailsService) {
+        this.jwtService = jwtService; this.userDetailsService = userDetailsService;
+    }
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
+        try {
+            String jwt = parseJwt(request);
+            if (jwt != null && jwtService.validateJwtToken(jwt)) {
+                String username = jwtService.getUserNameFromJwtToken(jwt);
+                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            }
+        } catch (Exception e) {
+            System.err.println("Cannot set user authentication: " + e);
+        }
+        filterChain.doFilter(request, response);
+    }
+    private String parseJwt(HttpServletRequest request) {
+        String headerAuth = request.getHeader("Authorization");
+        if (StringUtils.hasText(headerAuth) && headerAuth.startsWith("Bearer ")) {
+            return headerAuth.substring(7);
+        }
+        return null;
+    }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/aspect/LoggingAspect.java ---
+package com.example.ecommercebackend.aspect;
+
+import org.aspectj.lang.ProceedingJoinPoint;
+import org.aspectj.lang.annotation.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import java.util.Arrays;
+
+@Aspect
+@Component
+public class LoggingAspect {
+
+    private final Logger log = LoggerFactory.getLogger(this.getClass());
+
+    @Pointcut("within(@org.springframework.web.bind.annotation.RestController *) || " +
+              "within(@org.springframework.stereotype.Service *) || " +
+              "within(@org.springframework.stereotype.Repository *)")
+    public void springBeanPointcut() {
+    }
+
+    @Pointcut("within(com.example.ecommercebackend..*)")
+    public void applicationPackagePointcut() {
+    }
+
+    @Around("applicationPackagePointcut() && springBeanPointcut()")
+    public Object logAround(ProceedingJoinPoint joinPoint) throws Throwable {
+        if (log.isDebugEnabled()) {
+            log.debug("Enter: {}.{}() with argument[s] = {}", joinPoint.getSignature().getDeclaringTypeName(),
+                joinPoint.getSignature().getName(), Arrays.toString(joinPoint.getArgs()));
+        }
+        try {
+            Object result = joinPoint.proceed();
+            if (log.isDebugEnabled()) {
+                log.debug("Exit: {}.{}() with result = {}", joinPoint.getSignature().getDeclaringTypeName(),
+                    joinPoint.getSignature().getName(), result);
+            }
+            return result;
+        } catch (IllegalArgumentException e) {
+            log.error("Illegal argument: {} in {}.{}()", Arrays.toString(joinPoint.getArgs()),
+                joinPoint.getSignature().getDeclaringTypeName(), joinPoint.getSignature().getName());
+            throw e;
+        }
+    }
+}
+
+
+--- FILE: ./src/main/resources/application.properties ---
+spring.application.name=ecommercebackend
+
+# Varsayılan profil (postgres veya mysql olarak değiştirebilirsiniz)
+spring.profiles.active=postgres
+
+# JPA Ortak Ayarları
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.open-in-view=false
+
+# Disable Spring Security AuthenticationProvider warning
+logging.level.org.springframework.security.config.annotation.authentication.configuration.InitializeUserDetailsBeanManagerConfigurer=ERROR
+
+# Disable SpringDoc default endpoint warnings
+springdoc.api-docs.enabled=false
+springdoc.swagger-ui.enabled=false
+
+
+--- FILE: ./src/main/resources/application-postgres.properties ---
+# PostgreSQL Konfigürasyonu
+spring.datasource.url=${DB_URL:jdbc:postgresql://localhost:5432/ecommerce_analytics}
+spring.datasource.username=${DB_USER:user}
+spring.datasource.password=${DB_PASSWORD:password}
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+
+--- FILE: ./src/main/resources/application-mysql.properties ---
+# MySQL Konfigürasyonu
+spring.datasource.url=${DB_URL:jdbc:mysql://localhost:3306/ecommerce_analytics}
+spring.datasource.username=${DB_USER:user}
+spring.datasource.password=${DB_PASSWORD:password}
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+spring.jpa.database-platform=org.hibernate.dialect.MySQLDialect
+
+
+--- FILE: ./src/test/java/com/example/ecommercebackend/EcommercebackendApplicationTests.java ---
+package com.example.ecommercebackend;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@SpringBootTest
+class EcommercebackendApplicationTests {
+
+	@Test
+	void contextLoads() {
+	}
+
+}
+
+
+--- FILE: ./src/test/java/com/example/ecommercebackend/security/CustomUserDetailsServiceTest.java ---
+package com.example.ecommercebackend.security;
+
+import com.example.ecommercebackend.model.User;
+import com.example.ecommercebackend.model.enums.UserRole;
+import com.example.ecommercebackend.repository.UserRepository;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+public class CustomUserDetailsServiceTest {
+
+    @Mock
+    private UserRepository userRepository;
+
+    @InjectMocks
+    private CustomUserDetailsService userDetailsService;
+
+    @Test
+    void loadUserByUsername_UserExists_ReturnsUserDetails() {
+        // Arrange
+        User user = new User();
+        user.setId(1L);
+        user.setUsername("testuser");
+        user.setPassword("password");
+        user.setRole(UserRole.INDIVIDUAL);
+
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
+
+        // Act
+        UserDetails userDetails = userDetailsService.loadUserByUsername("testuser");
+
+        // Assert
+        assertNotNull(userDetails);
+        assertEquals("testuser", userDetails.getUsername());
+        verify(userRepository, times(1)).findByUsername("testuser");
+    }
+
+    @Test
+    void loadUserByUsername_UserDoesNotExist_ThrowsException() {
+        // Arrange
+        when(userRepository.findByUsername("unknown")).thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThrows(UsernameNotFoundException.class, () -> {
+            userDetailsService.loadUserByUsername("unknown");
+        });
+        verify(userRepository, times(1)).findByUsername("unknown");
+    }
+}
+
+--- FILE: ./src/test/java/com/example/ecommercebackend/aspect/LoggingAspectTest.java ---
+package com.example.ecommercebackend.aspect;
+
+import org.aspectj.lang.ProceedingJoinPoint;
+import org.aspectj.lang.Signature;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+public class LoggingAspectTest {
+
+    @InjectMocks
+    private LoggingAspect loggingAspect;
+
+    @Mock
+    private ProceedingJoinPoint joinPoint;
+
+    @Mock
+    private Signature signature;
+
+    @Test
+    void logAround_ShouldProceedAndReturnResult() throws Throwable {
+        // Arrange
+        Object expectedResult = new Object();
+        when(joinPoint.proceed()).thenReturn(expectedResult);
+        lenient().when(joinPoint.getSignature()).thenReturn(signature);
+        lenient().when(signature.getDeclaringTypeName()).thenReturn("TestClass");
+        lenient().when(signature.getName()).thenReturn("testMethod");
+        lenient().when(joinPoint.getArgs()).thenReturn(new Object[]{"arg1"});
+
+        // Act
+        Object actualResult = loggingAspect.logAround(joinPoint);
+
+        // Assert
+        assertEquals(expectedResult, actualResult);
+        verify(joinPoint, times(1)).proceed();
+    }
+    
+    @Test
+    void logAround_ShouldThrowExceptionOnProceed_WhenExceptionIsThrown() throws Throwable {
+        // Arrange
+        IllegalArgumentException exception = new IllegalArgumentException("Test exception");
+        when(joinPoint.proceed()).thenThrow(exception);
+        lenient().when(joinPoint.getSignature()).thenReturn(signature);
+        lenient().when(signature.getDeclaringTypeName()).thenReturn("TestClass");
+        lenient().when(signature.getName()).thenReturn("testMethod");
+        lenient().when(joinPoint.getArgs()).thenReturn(new Object[]{"arg1"});
+
+        // Act & Assert
+        assertThrows(IllegalArgumentException.class, () -> loggingAspect.logAround(joinPoint));
+        verify(joinPoint, times(1)).proceed();
+    }
+}
+
+
+--- FILE: ./pom.xml ---
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>4.0.6</version>
+		<relativePath/> <!-- lookup parent from repository -->
+	</parent>
+	<groupId>com.example</groupId>
+	<artifactId>ecommercebackend</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<name/>
+	<description/>
+	<url/>
+	<licenses>
+		<license/>
+	</licenses>
+	<developers>
+		<developer/>
+	</developers>
+	<scm>
+		<connection/>
+		<developerConnection/>
+		<tag/>
+		<url/>
+	</scm>
+	<properties>
+		<java.version>21</java.version>
+	</properties>
+	<dependencies>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webmvc</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>3.0.2</version>
+		</dependency>
+
+		<!-- Veritabanı Sürücüleri (Seçenek olarak her ikisi de eklendi) -->
+		<dependency>
+			<groupId>com.mysql</groupId>
+			<artifactId>mysql-connector-j</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.postgresql</groupId>
+			<artifactId>postgresql</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webmvc-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<!-- JWT Dependencies -->
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-api</artifactId>
+			<version>0.11.5</version>
+		</dependency>
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-impl</artifactId>
+			<version>0.11.5</version>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-jackson</artifactId>
+			<version>0.11.5</version>
+			<scope>runtime</scope>
+		</dependency>
+<dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+            <version>3.4.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.github.jsqlparser</groupId>
+            <artifactId>jsqlparser</artifactId>
+            <version>4.6</version>
+        </dependency>
+    </dependencies>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+			</plugin>
+		</plugins>
+	</build>
+
+</project>
+
+
+--- FILE: ./docker-compose.yml ---
+version: '3.8'
+services:
+  postgres-db:
+    image: postgres:15-alpine
+    container_name: postgres-ecommerce
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ecommerce_analytics
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  mysql-db:
+    image: mysql:8.0
+    container_name: mysql-ecommerce
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: ecommerce_analytics
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+volumes:
+  postgres-data:
+  mysql-data:

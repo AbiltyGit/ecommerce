@@ -1,0 +1,534 @@
+--- CHATBOT CONTEXT GENERATED ON Paz 26 Nis 2026 22:27:33 +03 ---
+
+
+--- FILE: ./state.py ---
+"""
+Defines the State structure for the LangGraph agents.
+This TypedDict ensures type safety and predictable state transitions across all agent nodes.
+"""
+
+from typing import TypedDict, Optional, Any, List, Dict
+
+class AgentState(TypedDict):
+    question: str
+    user_id: Optional[int]
+    role: Optional[str]
+    chat_history: Optional[List[Dict[str, str]]]
+    sql_query: Optional[str]
+    query_result: Optional[List[Dict[str, Any]]]
+    error: Optional[str]
+    bad_sql: Optional[str]
+    final_answer: Optional[str]
+    visualization_code: Optional[str]
+    is_in_scope: bool
+    iteration_count: int
+
+
+--- FILE: ./configs.py ---
+AGENT_CONFIGS = {
+    "guardrails_agent": {
+        "role": "Security and Scope Manager",
+        "system_prompt": """You are a friendly E-commerce AI Assistant. 
+If the user greets you, greet them back warmly. 
+If they ask a question related to e-commerce (products, orders, reviews, shipments, sales), respond positively. 
+If they ask something completely unrelated to e-commerce, politely decline. 
+Answer with only JSON in this format: {"is_in_scope": true/false, "message": "greeting or decline message if any"}""",
+    },
+    "sql_agent": {
+        "role": "SQL Expert",
+        "system_prompt": """You are an expert SQL Generator for a MySQL/PostgreSQL E-commerce database.
+Generate only valid SQL. No markdown, no explanations. 
+Schema Hint:
+- user (id, username, role)
+- product (id, title, price, category_id)
+- `order` (id, user_id, status, order_date)
+- order_item (id, order_id, product_id, quantity, price)
+- store (id, corporate_user_id, name)
+
+CRITICAL SECURITY RULES:
+1. If the user's role is INDIVIDUAL, they can ONLY see their own data. Ensure you add `WHERE user_id = {user_id}` or join appropriately.
+2. If the user's role is CORPORATE, they can ONLY see their store's data. Ensure you filter by their `corporate_user_id`.
+3. Only generate SELECT queries.
+""",
+    },
+    "error_agent": {
+        "role": "SQL Debugger",
+        "system_prompt": """You are an expert SQL Debugger. The previous SQL query failed to execute.
+Look at the error message and the bad SQL, and output ONLY a corrected valid SQL query. No markdown, no explanations.""",
+    },
+    "analysis_agent": {
+        "role": "Data Analyst",
+        "system_prompt": """You are an expert Data Analyst for an E-commerce platform.
+The user asked a question, and the database returned raw JSON data.
+Explain the results clearly, concisely, and accurately in natural language based on the raw data.
+Do not talk about SQL or the database. Just answer the user's question using the data.""",
+    },
+    "visualization_agent": {
+        "role": "Data Visualizer",
+        "system_prompt": """You are an expert Data Visualizer. 
+If the provided data has multiple rows and contains numeric/categorical data that can be visualized (like a bar chart or pie chart), 
+generate a Plotly JSON schema string to render it.
+If the data is just a single row or a single number, output NOTHING (empty string).
+Return ONLY the raw JSON string for Plotly if valid, otherwise empty string.""",
+    },
+}
+
+
+--- FILE: ./agents/guardrails.py ---
+import os
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import SystemMessage, HumanMessage
+import json
+import sys
+
+# Add parent dir to path so configs can be imported
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from configs import AGENT_CONFIGS
+
+
+def guardrails_node(state):
+    # Provide a dummy fallback if no API key is present for testing
+    if not os.environ.get("OPENAI_API_KEY"):
+        state["is_in_scope"] = True
+        return state
+
+    try:
+        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+        prompt = AGENT_CONFIGS["guardrails_agent"]["system_prompt"]
+
+        question = state.get("question", "")
+
+        messages = [
+            SystemMessage(content=prompt)
+        ]
+        
+        for msg in state.get("chat_history", []):
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            if role == "user":
+                messages.append(HumanMessage(content=content))
+            else:
+                messages.append(SystemMessage(content=content))
+                
+        messages.append(HumanMessage(content=question))
+        response = llm.invoke(messages)
+        content = response.content
+
+        # strip markdown json if present
+        if content.startswith("```json"):
+            content = content[7:-3]
+        elif content.startswith("```"):
+            content = content[3:-3]
+
+        parsed = json.loads(content)
+        state["is_in_scope"] = parsed.get("is_in_scope", True)
+        if not state["is_in_scope"] or parsed.get("message"):
+            state["final_answer"] = parsed.get(
+                "message", "I'm sorry, I can only help with e-commerce related queries."
+            )
+    except Exception as e:
+        print(f"Guardrails Error: {e}")
+        state["is_in_scope"] = True
+
+    return state
+
+
+--- FILE: ./agents/sql_agent.py ---
+import os
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import SystemMessage, HumanMessage
+import sys
+
+# Add parent dir to path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from configs import AGENT_CONFIGS
+
+
+def sql_agent_node(state):
+    # Dummy fallback if no API key is present
+    if not os.environ.get("OPENAI_API_KEY"):
+        state["sql_query"] = "SELECT * FROM product"
+        state["final_answer"] = "Generated dummy SQL due to missing API Key."
+        return state
+
+    try:
+        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+        prompt = AGENT_CONFIGS["sql_agent"]["system_prompt"]
+
+        user_id = state.get("user_id", "UNKNOWN")
+        role = state.get("role", "UNKNOWN")
+
+        # Inject Context dynamically
+        context_prompt = f"{prompt}\n\nCURRENT USER CONTEXT:\n- User ID: {user_id}\n- Role: {role}\n\nALWAYS apply the security rules based on this context."
+
+        messages = [
+            SystemMessage(content=context_prompt)
+        ]
+        
+        for msg in state.get("chat_history", []):
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            if role == "user":
+                messages.append(HumanMessage(content=content))
+            else:
+                messages.append(SystemMessage(content=content))
+                
+        messages.append(HumanMessage(content=state.get("question", "")))
+
+        response = llm.invoke(messages)
+        sql_query = response.content.strip()
+
+        # Clean markdown if present
+        if sql_query.startswith("```sql"):
+            sql_query = sql_query[6:-3].strip()
+        elif sql_query.startswith("```"):
+            sql_query = sql_query[3:-3].strip()
+
+        state["sql_query"] = sql_query
+        state["final_answer"] = "Generated SQL successfully."
+    except Exception as e:
+        print(f"SQL Agent Error: {e}")
+        state["sql_query"] = None
+        state["final_answer"] = f"Failed to generate SQL: {str(e)}"
+
+    return state
+
+
+--- FILE: ./agents/analysis_agent.py ---
+import os
+import json
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import SystemMessage, HumanMessage
+import sys
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from configs import AGENT_CONFIGS
+
+
+def analysis_agent_node(state):
+    # Fallback
+    if not os.environ.get("OPENAI_API_KEY"):
+        state["final_answer"] = "Data analysis complete. (Dummy analysis text)"
+        return state
+
+    try:
+        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+        prompt = AGENT_CONFIGS["analysis_agent"]["system_prompt"]
+
+        question = state.get("question", "")
+        data = state.get("query_result", [])
+
+        messages = [
+            SystemMessage(content=prompt),
+            HumanMessage(
+                content=f"User Question: {question}\n\nDatabase Result: {json.dumps(data)}"
+            ),
+        ]
+
+        response = llm.invoke(messages)
+        state["final_answer"] = response.content.strip()
+    except Exception as e:
+        print(f"Analysis Agent Error: {e}")
+        state["final_answer"] = "Error analyzing data."
+
+    return state
+
+
+--- FILE: ./agents/visualization_agent.py ---
+import os
+import json
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import SystemMessage, HumanMessage
+import sys
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from configs import AGENT_CONFIGS
+
+
+def visualization_agent_node(state):
+    # Fallback
+    if not os.environ.get("OPENAI_API_KEY"):
+        state["visualization_code"] = ""
+        return state
+
+    data = state.get("query_result", [])
+    if not data or len(data) < 2:
+        state["visualization_code"] = ""
+        return state
+
+    try:
+        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+        prompt = AGENT_CONFIGS["visualization_agent"]["system_prompt"]
+
+        messages = [
+            SystemMessage(content=prompt),
+            HumanMessage(content=f"Data to visualize: {json.dumps(data)}"),
+        ]
+
+        response = llm.invoke(messages)
+        code = response.content.strip()
+
+        if code.startswith("```json"):
+            code = code[7:-3].strip()
+        elif code.startswith("```"):
+            code = code[3:-3].strip()
+
+        state["visualization_code"] = code
+    except Exception as e:
+        print(f"Visualization Agent Error: {e}")
+        state["visualization_code"] = ""
+
+    return state
+
+
+--- FILE: ./agents/error_agent.py ---
+import os
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import SystemMessage, HumanMessage
+import sys
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from configs import AGENT_CONFIGS
+
+
+def error_agent_node(state):
+    # Fallback
+    if not os.environ.get("OPENAI_API_KEY"):
+        state["sql_query"] = "SELECT * FROM product LIMIT 1"
+        return state
+
+    try:
+        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+        prompt = AGENT_CONFIGS["error_agent"]["system_prompt"]
+
+        bad_sql = state.get("bad_sql", "")
+        error_msg = state.get("error", "")
+
+        messages = [
+            SystemMessage(content=prompt),
+            HumanMessage(content=f"Bad SQL: {bad_sql}\nError Message: {error_msg}"),
+        ]
+
+        response = llm.invoke(messages)
+        sql_query = response.content.strip()
+
+        if sql_query.startswith("```sql"):
+            sql_query = sql_query[6:-3].strip()
+        elif sql_query.startswith("```"):
+            sql_query = sql_query[3:-3].strip()
+
+        state["sql_query"] = sql_query
+    except Exception as e:
+        print(f"Error Agent Error: {e}")
+        state["sql_query"] = state.get("bad_sql", "")
+
+    return state
+
+
+--- FILE: ./sampling.py ---
+import pandas as pd
+import os
+import glob
+
+
+def sample_large_datasets(input_dir, output_dir, sample_fraction=0.01):
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    # We are looking for large .tsv and .csv files
+    tsv_files = glob.glob(os.path.join(input_dir, "*.tsv"))
+    csv_files = glob.glob(os.path.join(input_dir, "*.csv"))
+
+    all_files = tsv_files + csv_files
+
+    for file_path in all_files:
+        file_name = os.path.basename(file_path)
+        output_path = os.path.join(output_dir, f"sampled_{file_name}")
+
+        print(f"Processing {file_name}...")
+
+        # Determine separator
+        sep = "\t" if file_path.endswith(".tsv") else ","
+
+        sampled_chunks = []
+        try:
+            # Read in chunks to avoid OOM for large files
+            chunk_iter = pd.read_csv(
+                file_path,
+                sep=sep,
+                chunksize=50000,
+                on_bad_lines="skip",
+                low_memory=False,
+            )
+
+            for chunk in chunk_iter:
+                # Basic Cleaning: drop rows where all columns are NaN
+                chunk.dropna(how="all", inplace=True)
+
+                # Sample the chunk
+                sampled_chunk = chunk.sample(frac=sample_fraction, random_state=42)
+                sampled_chunks.append(sampled_chunk)
+
+            # Combine all sampled chunks
+            if sampled_chunks:
+                final_df = pd.concat(sampled_chunks, ignore_index=True)
+
+                # Save the sampled data
+                final_df.to_csv(output_path, sep=sep, index=False)
+                print(f"Saved sampled data to {output_path} (Rows: {len(final_df)})")
+            else:
+                print(f"Warning: {file_name} was empty after cleaning.")
+
+        except Exception as e:
+            print(f"Error processing {file_name}: {str(e)}")
+
+
+if __name__ == "__main__":
+    # Adjust paths based on location
+    INPUT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data"))
+    OUTPUT_DIR = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "sampled_data")
+    )
+
+    print(f"Starting ETL Sampling Process...\nInput: {INPUT_DIR}\nOutput: {OUTPUT_DIR}")
+    sample_large_datasets(INPUT_DIR, OUTPUT_DIR, sample_fraction=0.01)
+    print("ETL Process Completed!")
+
+
+--- FILE: ./graph.py ---
+from langgraph.graph import StateGraph, END
+from state import AgentState
+from agents.guardrails import guardrails_node
+from agents.sql_agent import sql_agent_node
+from agents.analysis_agent import analysis_agent_node
+from agents.visualization_agent import visualization_agent_node
+from agents.error_agent import error_agent_node
+
+# 1. Ask Workflow
+ask_workflow = StateGraph(AgentState)
+ask_workflow.add_node("guardrails", guardrails_node)
+ask_workflow.add_node("sql_agent", sql_agent_node)
+ask_workflow.set_entry_point("guardrails")
+
+
+def route_ask(state: AgentState):
+    if not state.get("is_in_scope", True):
+        return END
+    return "sql_agent"
+
+
+ask_workflow.add_conditional_edges(
+    "guardrails", route_ask, {"sql_agent": "sql_agent", END: END}
+)
+ask_workflow.add_edge("sql_agent", END)
+ask_app = ask_workflow.compile()
+
+# 2. Analyze Workflow
+analyze_workflow = StateGraph(AgentState)
+analyze_workflow.add_node("analysis_agent", analysis_agent_node)
+analyze_workflow.add_node("visualization_agent", visualization_agent_node)
+analyze_workflow.set_entry_point("analysis_agent")
+analyze_workflow.add_edge("analysis_agent", "visualization_agent")
+analyze_workflow.add_edge("visualization_agent", END)
+analyze_app = analyze_workflow.compile()
+
+# 3. Error Workflow
+error_workflow = StateGraph(AgentState)
+error_workflow.add_node("error_agent", error_agent_node)
+error_workflow.set_entry_point("error_agent")
+error_workflow.add_edge("error_agent", END)
+error_app = error_workflow.compile()
+
+
+--- FILE: ./main.py ---
+"""
+FastAPI entry point for the Ecommerce AI Agentic Bridge.
+This module hosts the endpoints that Java Spring Boot calls to interact with the LangGraph agents.
+"""
+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from typing import List, Dict, Any, Optional
+from graph import ask_app, analyze_app, error_app
+from dotenv import load_dotenv
+
+load_dotenv()
+
+app = FastAPI(title="Ecommerce AI Agentic Bridge")
+
+
+class AskRequest(BaseModel):
+    """Payload for requesting a Text2SQL generation."""
+    question: str
+    user_id: int
+    role: str
+    chat_history: Optional[List[Dict[str, str]]] = []
+
+class AnalyzeRequest(BaseModel):
+    """Payload for analyzing the raw data returned from the database."""
+    question: str
+    data: List[Dict[str, Any]]
+
+
+class FixSqlRequest(BaseModel):
+    """Payload for requesting a fix to a failed SQL query."""
+    bad_sql: str
+    error: str
+
+
+@app.post("/ask")
+async def ask_question(request: AskRequest):
+    """
+    Endpoint to process a user's question and generate a valid SQL query via the Ask Workflow.
+    """
+    try:
+        initial_state = {
+            "question": request.question,
+            "user_id": request.user_id,
+            "role": request.role,
+            "chat_history": request.chat_history,
+            "is_in_scope": True,
+            "iteration_count": 0,
+        }
+        result = ask_app.invoke(initial_state)
+        return {
+            "sql_query": result.get("sql_query"),
+            "answer": result.get("final_answer", "Processing completed."),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ask Agent Error: {str(e)}")
+
+
+@app.post("/analyze")
+async def analyze_data(request: AnalyzeRequest):
+    """
+    Endpoint to analyze raw database results and optionally generate a visualization code.
+    """
+    try:
+        initial_state = {"question": request.question, "query_result": request.data}
+        result = analyze_app.invoke(initial_state)
+        return {
+            "answer": result.get("final_answer", "Analysis completed."),
+            "visualization_code": result.get("visualization_code", ""),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Analyze Agent Error: {str(e)}")
+
+
+@app.post("/fix_sql")
+async def fix_sql(request: FixSqlRequest):
+    """
+    Endpoint to fix a broken SQL query using the Error Agent.
+    """
+    try:
+        initial_state = {"bad_sql": request.bad_sql, "error": request.error}
+        result = error_app.invoke(initial_state)
+        return {"sql_query": result.get("sql_query")}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error Agent Error: {str(e)}")
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=8000)

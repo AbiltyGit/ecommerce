@@ -1,0 +1,41 @@
+<div class="flex items-center justify-center min-h-screen p-4">
+  <div class="glass-panel p-10 rounded-2xl w-full max-w-md animate-fade-in relative overflow-hidden">
+    <!-- Decorative background elements -->
+    <div class="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500 rounded-full blur-3xl opacity-30 animate-pulse-slow"></div>
+    <div class="absolute -bottom-10 -left-10 w-32 h-32 bg-purple-500 rounded-full blur-3xl opacity-30 animate-pulse-slow" style="animation-delay: 2s"></div>
+    
+    <div class="relative z-10">
+      <div class="flex justify-center mb-6">
+        <div class="w-16 h-16 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center shadow-lg shadow-indigo-500/50">
+          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12a10 10 0 1 0 20 0 10 10 0 1 0-20 0Z"/><path d="M12 12v.01"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4.93 4.93l1.41 1.41"/><path d="M17.66 17.66l1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M4.93 19.07l1.41-1.41"/><path d="M17.66 6.34l1.41-1.41"/></svg>
+        </div>
+      </div>
+      <h2 class="text-3xl font-bold mb-2 text-center text-white">AI Analytics</h2>
+      <p class="text-slate-300 text-center mb-8">Sign in to your intelligent dashboard</p>
+      
+      <form (ngSubmit)="onSubmit()" class="space-y-6">
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-1">Username</label>
+          <input type="text" [(ngModel)]="username" name="username" class="glass-input w-full px-4 py-3 rounded-xl" placeholder="admin" required>
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-1">Password</label>
+          <input type="password" [(ngModel)]="password" name="password" class="glass-input w-full px-4 py-3 rounded-xl" placeholder="••••••••" required>
+        </div>
+        
+        <button type="submit" [disabled]="loading" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-200 shadow-lg shadow-indigo-500/30 flex justify-center items-center gap-2">
+          <svg *ngIf="loading" class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          {{ loading ? 'Authenticating...' : 'Enter Platform' }}
+        </button>
+        
+        <div *ngIf="error" class="text-red-400 text-sm text-center mt-4 bg-red-500/10 py-2 rounded-lg border border-red-500/20">
+          {{ error }}
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

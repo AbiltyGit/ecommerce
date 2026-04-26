@@ -1,0 +1,1165 @@
+--- FRONTEND CONTEXT GENERATED ON Paz 26 Nis 2026 22:26:31 +03 ---
+
+
+--- FILE: ./.vscode/extensions.json ---
+{
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=827846
+  "recommendations": ["angular.ng-template"]
+}
+
+
+--- FILE: ./.vscode/launch.json ---
+{
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "ng serve",
+      "type": "chrome",
+      "request": "launch",
+      "preLaunchTask": "npm: start",
+      "url": "http://localhost:4200/"
+    },
+    {
+      "name": "ng test",
+      "type": "chrome",
+      "request": "launch",
+      "preLaunchTask": "npm: test",
+      "url": "http://localhost:9876/debug.html"
+    }
+  ]
+}
+
+
+--- FILE: ./.vscode/mcp.json ---
+{
+  // For more information, visit: https://angular.dev/ai/mcp
+  "servers": {
+    "angular-cli": {
+      "command": "npx",
+      "args": ["-y", "@angular/cli", "mcp"]
+    }
+  }
+}
+
+
+--- FILE: ./.vscode/tasks.json ---
+{
+  // For more information, visit: https://go.microsoft.com/fwlink/?LinkId=733558
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "type": "npm",
+      "script": "start",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "typescript",
+        "pattern": "$tsc",
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": {
+            "regexp": "Changes detected"
+          },
+          "endsPattern": {
+            "regexp": "bundle generation (complete|failed)"
+          }
+        }
+      }
+    },
+    {
+      "type": "npm",
+      "script": "test",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "typescript",
+        "pattern": "$tsc",
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": {
+            "regexp": "Changes detected"
+          },
+          "endsPattern": {
+            "regexp": "bundle generation (complete|failed)"
+          }
+        }
+      }
+    }
+  ]
+}
+
+
+--- FILE: ./src/main.ts ---
+import { bootstrapApplication } from '@angular/platform-browser';
+import { appConfig } from './app/app.config';
+import { App } from './app/app';
+
+bootstrapApplication(App, appConfig)
+  .catch((err) => console.error(err));
+
+
+--- FILE: ./src/index.html ---
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Ecommercefrontend</title>
+  <base href="/">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+</head>
+<body>
+  <app-root></app-root>
+</body>
+</html>
+
+
+--- FILE: ./src/styles.css ---
+@import 'tailwindcss';
+
+@theme {
+    --color-primary: #6366f1;
+    --color-secondary: #a855f7;
+    --color-dark: #0f172a;
+    --color-darker: #020617;
+    --color-glass: rgba(255, 255, 255, 0.05);
+    --color-glass-border: rgba(255, 255, 255, 0.1);
+}
+
+body {
+  background-color: var(--color-darker);
+  color: #f8fafc;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image: 
+    radial-gradient(circle at 15% 50%, rgba(99, 102, 241, 0.15), transparent 25%),
+    radial-gradient(circle at 85% 30%, rgba(168, 85, 247, 0.15), transparent 25%);
+}
+
+/* Glassmorphism Utilities */
+.glass-panel {
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+.glass-card {
+  background: rgba(30, 41, 59, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.glass-input {
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: white;
+  backdrop-filter: blur(4px);
+  transition: all 0.3s ease;
+}
+
+.glass-input:focus {
+  outline: none;
+  border-color: rgba(99, 102, 241, 0.5);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+.message-bubble-user {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.9), rgba(79, 70, 229, 0.9));
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 4px 15px rgba(79, 70, 229, 0.25);
+}
+
+.message-bubble-ai {
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+/* Markdown table styling inside AI response */
+.ai-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.ai-content th, .ai-content td {
+  padding: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ai-content th {
+  background: rgba(255, 255, 255, 0.05);
+  text-align: left;
+}
+
+
+--- FILE: ./src/app/app.css ---
+
+
+--- FILE: ./src/app/app.spec.ts ---
+import { TestBed } from '@angular/core/testing';
+import { App } from './app';
+
+describe('App', () => {
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [App],
+    }).compileComponents();
+  });
+
+  it('should create the app', () => {
+    const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance;
+    expect(app).toBeTruthy();
+  });
+
+  it('should render title', async () => {
+    const fixture = TestBed.createComponent(App);
+    await fixture.whenStable();
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('h1')?.textContent).toContain('Hello, ecommercefrontend');
+  });
+});
+
+
+--- FILE: ./src/app/app.ts ---
+import { Component, signal } from '@angular/core';
+import { RouterOutlet } from '@angular/router';
+
+@Component({
+  selector: 'app-root',
+  imports: [RouterOutlet],
+  templateUrl: './app.html',
+  styleUrl: './app.css'
+})
+export class App {
+  protected readonly title = signal('ecommercefrontend');
+}
+
+
+--- FILE: ./src/app/app.html ---
+<router-outlet></router-outlet>
+
+
+--- FILE: ./src/app/app.config.ts ---
+import { ApplicationConfig, provideBrowserGlobalErrorListeners } from '@angular/core';
+import { provideRouter } from '@angular/router';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { authInterceptor } from './interceptors/auth-interceptor';
+
+import { routes } from './app.routes';
+
+export const appConfig: ApplicationConfig = {
+  providers: [
+    provideBrowserGlobalErrorListeners(),
+    provideRouter(routes),
+    provideHttpClient(withInterceptors([authInterceptor]))
+  ]
+};
+
+
+--- FILE: ./src/app/app.routes.ts ---
+import { Routes } from '@angular/router';
+import { Login } from './login/login';
+import { Chat } from './chat/chat';
+import { authGuard } from './guards/auth-guard';
+
+export const routes: Routes = [
+  { path: 'login', component: Login },
+  { path: 'chat', component: Chat, canActivate: [authGuard] },
+  { path: '', redirectTo: '/login', pathMatch: 'full' },
+  { path: '**', redirectTo: '/login' }
+];
+
+
+--- FILE: ./src/app/login/login.css ---
+
+
+--- FILE: ./src/app/login/login.spec.ts ---
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+
+import { Login } from './login';
+
+describe('Login', () => {
+  let component: Login;
+  let fixture: ComponentFixture<Login>;
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [Login],
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(Login);
+    component = fixture.componentInstance;
+    await fixture.whenStable();
+  });
+
+  it('should create', () => {
+    expect(component).toBeTruthy();
+  });
+});
+
+
+--- FILE: ./src/app/login/login.ts ---
+import { Component } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { AuthService } from '../services/auth';
+import { Router } from '@angular/router';
+
+@Component({
+  selector: 'app-login',
+  standalone: true,
+  imports: [CommonModule, FormsModule],
+  templateUrl: './login.html'
+})
+export class Login {
+  username = '';
+  password = '';
+  loading = false;
+  error = '';
+
+  constructor(private authService: AuthService, private router: Router) {}
+
+  onSubmit() {
+    this.loading = true;
+    this.error = '';
+    
+    this.authService.login({ username: this.username, password: this.password }).subscribe({
+      next: () => {
+        this.router.navigate(['/chat']);
+      },
+      error: (err) => {
+        this.error = 'Invalid credentials or connection error.';
+        this.loading = false;
+      }
+    });
+  }
+}
+
+
+--- FILE: ./src/app/login/login.html ---
+<div class="flex items-center justify-center min-h-screen p-4">
+  <div class="glass-panel p-10 rounded-2xl w-full max-w-md animate-fade-in relative overflow-hidden">
+    <!-- Decorative background elements -->
+    <div class="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500 rounded-full blur-3xl opacity-30 animate-pulse-slow"></div>
+    <div class="absolute -bottom-10 -left-10 w-32 h-32 bg-purple-500 rounded-full blur-3xl opacity-30 animate-pulse-slow" style="animation-delay: 2s"></div>
+    
+    <div class="relative z-10">
+      <div class="flex justify-center mb-6">
+        <div class="w-16 h-16 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center shadow-lg shadow-indigo-500/50">
+          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12a10 10 0 1 0 20 0 10 10 0 1 0-20 0Z"/><path d="M12 12v.01"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4.93 4.93l1.41 1.41"/><path d="M17.66 17.66l1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M4.93 19.07l1.41-1.41"/><path d="M17.66 6.34l1.41-1.41"/></svg>
+        </div>
+      </div>
+      <h2 class="text-3xl font-bold mb-2 text-center text-white">AI Analytics</h2>
+      <p class="text-slate-300 text-center mb-8">Sign in to your intelligent dashboard</p>
+      
+      <form (ngSubmit)="onSubmit()" class="space-y-6">
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-1">Username</label>
+          <input type="text" [(ngModel)]="username" name="username" class="glass-input w-full px-4 py-3 rounded-xl" placeholder="admin" required>
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-1">Password</label>
+          <input type="password" [(ngModel)]="password" name="password" class="glass-input w-full px-4 py-3 rounded-xl" placeholder="••••••••" required>
+        </div>
+        
+        <button type="submit" [disabled]="loading" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-200 shadow-lg shadow-indigo-500/30 flex justify-center items-center gap-2">
+          <svg *ngIf="loading" class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          {{ loading ? 'Authenticating...' : 'Enter Platform' }}
+        </button>
+        
+        <div *ngIf="error" class="text-red-400 text-sm text-center mt-4 bg-red-500/10 py-2 rounded-lg border border-red-500/20">
+          {{ error }}
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+
+--- FILE: ./src/app/chat/chat.css ---
+
+
+--- FILE: ./src/app/chat/chat.spec.ts ---
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+
+import { Chat } from './chat';
+
+describe('Chat', () => {
+  let component: Chat;
+  let fixture: ComponentFixture<Chat>;
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [Chat],
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(Chat);
+    component = fixture.componentInstance;
+    await fixture.whenStable();
+  });
+
+  it('should create', () => {
+    expect(component).toBeTruthy();
+  });
+});
+
+
+--- FILE: ./src/app/chat/chat.ts ---
+import { Component, ElementRef, ViewChild, AfterViewChecked } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { ChatService, ChatMessage } from '../services/chat';
+import { AuthService } from '../services/auth';
+import { PlotlyRender } from '../plotly-render/plotly-render';
+
+@Component({
+  selector: 'app-chat',
+  standalone: true,
+  imports: [CommonModule, FormsModule, PlotlyRender],
+  templateUrl: './chat.html'
+})
+export class Chat implements AfterViewChecked {
+  @ViewChild('scrollContainer') private scrollContainer!: ElementRef;
+  
+  question = '';
+  loading = false;
+  messages: (ChatMessage & { visualizationCode?: string, data?: any[] })[] = [];
+
+  constructor(
+    private chatService: ChatService,
+    private authService: AuthService
+  ) {
+    // If we wanted to load history immediately:
+    this.messages = this.chatService.getHistory();
+  }
+
+  ngAfterViewChecked() {
+    this.scrollToBottom();
+  }
+
+  scrollToBottom(): void {
+    try {
+      this.scrollContainer.nativeElement.scrollTop = this.scrollContainer.nativeElement.scrollHeight;
+    } catch(err) { }
+  }
+
+  logout() {
+    this.authService.logout();
+  }
+
+  getObjectKeys(obj: any): string[] {
+    return obj ? Object.keys(obj) : [];
+  }
+
+  formatMessage(content: string): string {
+    // Basic Markdown formatting for bold and line breaks
+    return content
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\n/g, '<br>');
+  }
+
+  ask() {
+    if (!this.question.trim()) return;
+    
+    const userMsg = this.question;
+    this.question = '';
+    
+    const newMsg: ChatMessage = { role: 'user', content: userMsg };
+    this.chatService.addMessage(newMsg);
+    this.messages = this.chatService.getHistory();
+    
+    this.loading = true;
+    
+    this.chatService.askQuestion(userMsg).subscribe({
+      next: (res) => {
+        const assistantMsg: ChatMessage & { visualizationCode?: string, data?: any[] } = {
+          role: 'assistant',
+          content: res.answer,
+          visualizationCode: res.visualizationCode,
+          data: res.data
+        };
+        this.chatService.addMessage(assistantMsg);
+        this.messages = this.chatService.getHistory();
+        this.loading = false;
+      },
+      error: (err) => {
+        const errorMsg: ChatMessage = {
+          role: 'assistant',
+          content: 'Sorry, I encountered an error while connecting to the Agentic Bridge. Make sure both Java and Python servers are running.'
+        };
+        this.chatService.addMessage(errorMsg);
+        this.messages = this.chatService.getHistory();
+        this.loading = false;
+      }
+    });
+  }
+}
+
+
+--- FILE: ./src/app/chat/chat.html ---
+<div class="flex h-screen overflow-hidden w-full">
+  <!-- Sidebar -->
+  <aside class="w-64 glass-panel border-r border-white/5 flex flex-col h-full hidden md:flex shrink-0">
+    <div class="p-6 border-b border-white/5 flex items-center gap-3">
+      <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      </div>
+      <h2 class="text-xl font-bold text-white tracking-tight">AI Analytics</h2>
+    </div>
+    <div class="flex-1 overflow-y-auto p-4 space-y-2">
+      <button class="w-full text-left px-4 py-3 rounded-xl bg-indigo-500/20 text-indigo-300 font-medium border border-indigo-500/30 flex items-center gap-3 transition-all shadow-sm">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg>
+        Data Exploration
+      </button>
+      <button class="w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 text-slate-400 font-medium transition-all flex items-center gap-3">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+        Dashboards
+      </button>
+    </div>
+    <div class="p-4 border-t border-white/5">
+      <button (click)="logout()" class="w-full py-3 px-4 rounded-xl hover:bg-red-500/10 hover:text-red-400 text-slate-400 font-medium transition-colors flex items-center gap-3 justify-center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Chat Area -->
+  <main class="flex-1 flex flex-col h-full relative overflow-hidden bg-slate-900/40">
+    <!-- Header -->
+    <header class="h-16 glass-panel border-b border-white/5 flex items-center justify-between px-6 z-10 shrink-0">
+      <h1 class="text-lg font-semibold text-white flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse-slow shadow-[0_0_8px_rgba(74,222,128,0.6)]"></span>
+        Ask the Database
+      </h1>
+      <div class="text-sm font-medium text-slate-400 flex items-center gap-2">
+        Powered by LangGraph
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      </div>
+    </header>
+
+    <!-- Chat Messages -->
+    <div class="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 scroll-smooth" #scrollContainer>
+      <!-- Initial greeting -->
+      <div class="flex flex-col items-center justify-center text-center mt-12 mb-8 animate-fade-in" *ngIf="messages.length === 0">
+        <div class="w-20 h-20 rounded-full bg-gradient-to-tr from-indigo-500/20 to-purple-500/20 flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(99,102,241,0.15)]">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+        </div>
+        <h2 class="text-3xl font-bold text-white mb-3">How can I help you?</h2>
+        <p class="text-slate-400 max-w-md text-lg leading-relaxed">Ask anything about your e-commerce data. I can fetch reviews, analyze sales, and visualize metrics instantly.</p>
+        <div class="mt-10 flex flex-wrap justify-center gap-3 w-full max-w-2xl">
+          <button (click)="question = 'Show me the top 5 products by review count'; ask()" class="px-5 py-3 rounded-full bg-slate-800/50 border border-white/10 hover:border-indigo-500/50 hover:bg-indigo-500/10 text-sm font-medium text-slate-300 transition-all shadow-sm">Top 5 products by reviews</button>
+          <button (click)="question = 'What is the average rating for Beauty category?'; ask()" class="px-5 py-3 rounded-full bg-slate-800/50 border border-white/10 hover:border-purple-500/50 hover:bg-purple-500/10 text-sm font-medium text-slate-300 transition-all shadow-sm">Average rating in Beauty</button>
+        </div>
+      </div>
+
+      <!-- Messages Loop -->
+      <div *ngFor="let msg of messages" class="animate-fade-in flex flex-col w-full" [ngClass]="msg.role === 'user' ? 'items-end' : 'items-start'">
+        
+        <div class="flex w-full" [ngClass]="msg.role === 'user' ? 'justify-end' : 'justify-start max-w-[95%] md:max-w-[85%]'">
+          <!-- AI Avatar -->
+          <div *ngIf="msg.role === 'assistant'" class="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 flex-shrink-0 flex items-center justify-center mr-4 mt-1 shadow-lg shadow-indigo-500/20">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          </div>
+          
+          <div class="flex flex-col" [ngClass]="msg.role === 'user' ? 'max-w-[85%] md:max-w-[70%]' : 'w-full'">
+            <div class="p-5 rounded-2xl text-[15px] leading-relaxed shadow-sm" [ngClass]="msg.role === 'user' ? 'message-bubble-user text-white rounded-tr-sm' : 'message-bubble-ai text-slate-200 rounded-tl-sm'">
+              <!-- Formatted Text -->
+              <div class="whitespace-pre-wrap ai-content" [innerHTML]="formatMessage(msg.content)"></div>
+            </div>
+            
+            <!-- Plotly Rendering Area -->
+            <div *ngIf="msg.visualizationCode" class="mt-4 w-full">
+              <app-plotly-render [code]="msg.visualizationCode"></app-plotly-render>
+            </div>
+            
+            <!-- Raw Data Table (if data exists and is array) -->
+            <div *ngIf="msg.data && msg.data.length > 0" class="mt-3 text-xs text-slate-400 p-4 bg-slate-800/40 rounded-xl overflow-x-auto border border-white/5 backdrop-blur-sm">
+               <details>
+                 <summary class="cursor-pointer hover:text-white font-medium transition-colors select-none">View Raw Data ({{msg.data.length}} rows)</summary>
+                 <div class="mt-3 rounded-lg overflow-hidden border border-white/10">
+                   <table class="w-full border-collapse text-left bg-slate-900/50">
+                     <thead class="bg-slate-800/80 text-slate-300">
+                       <tr>
+                         <th *ngFor="let key of getObjectKeys(msg.data[0])" class="p-3 font-semibold border-b border-white/10">{{key}}</th>
+                       </tr>
+                     </thead>
+                     <tbody class="divide-y divide-white/5">
+                       <tr *ngFor="let row of msg.data | slice:0:5" class="hover:bg-white/5 transition-colors">
+                         <td *ngFor="let key of getObjectKeys(row)" class="p-3 truncate max-w-[200px]">{{row[key]}}</td>
+                       </tr>
+                     </tbody>
+                   </table>
+                 </div>
+                 <div *ngIf="msg.data.length > 5" class="text-center mt-3 text-slate-500 font-medium">... and {{msg.data.length - 5}} more rows</div>
+               </details>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading Indicator -->
+      <div *ngIf="loading" class="animate-fade-in flex items-start w-full">
+        <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 flex-shrink-0 flex items-center justify-center mr-4 mt-1 shadow-lg shadow-indigo-500/20">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        </div>
+        <div class="p-5 rounded-2xl message-bubble-ai text-slate-200 rounded-tl-sm flex items-center gap-2 shadow-sm h-[58px]">
+          <div class="w-2.5 h-2.5 rounded-full bg-indigo-400 animate-bounce"></div>
+          <div class="w-2.5 h-2.5 rounded-full bg-purple-400 animate-bounce" style="animation-delay: 0.15s"></div>
+          <div class="w-2.5 h-2.5 rounded-full bg-indigo-400 animate-bounce" style="animation-delay: 0.3s"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Input Area -->
+    <div class="p-4 md:p-6 glass-panel border-t border-white/5 z-10 shrink-0">
+      <form (ngSubmit)="ask()" class="relative max-w-4xl mx-auto flex items-end gap-3">
+        <div class="relative w-full">
+          <input 
+            type="text" 
+            [(ngModel)]="question" 
+            name="question"
+            [disabled]="loading"
+            class="w-full bg-slate-800/60 border border-white/10 px-6 py-4 rounded-2xl text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 shadow-inner backdrop-blur-md transition-all text-[15px]"
+            placeholder="Ask about your sales, users, or products..."
+            autocomplete="off"
+          >
+        </div>
+        <button 
+          type="submit" 
+          [disabled]="loading || !question.trim()" 
+          class="w-14 h-14 shrink-0 bg-gradient-to-tr from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:from-slate-700 disabled:to-slate-700 disabled:opacity-50 text-white rounded-2xl flex items-center justify-center transition-all shadow-lg shadow-indigo-500/25"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" [class.animate-pulse]="loading"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </form>
+    </div>
+  </main>
+</div>
+
+
+--- FILE: ./src/app/plotly-render/plotly-render.css ---
+
+
+--- FILE: ./src/app/plotly-render/plotly-render.spec.ts ---
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+
+import { PlotlyRender } from './plotly-render';
+
+describe('PlotlyRender', () => {
+  let component: PlotlyRender;
+  let fixture: ComponentFixture<PlotlyRender>;
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [PlotlyRender],
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(PlotlyRender);
+    component = fixture.componentInstance;
+    await fixture.whenStable();
+  });
+
+  it('should create', () => {
+    expect(component).toBeTruthy();
+  });
+});
+
+
+--- FILE: ./src/app/plotly-render/plotly-render.ts ---
+import { Component, Input, AfterViewInit, ElementRef, ViewChild } from '@angular/core';
+import * as Plotly from 'plotly.js-dist-min';
+
+@Component({
+  selector: 'app-plotly-render',
+  standalone: true,
+  template: `<div #plotContainer [id]="plotId" class="w-full h-80 rounded-xl overflow-hidden glass-card my-4"></div>`
+})
+export class PlotlyRender implements AfterViewInit {
+  @Input() code!: string;
+  @ViewChild('plotContainer') plotContainer!: ElementRef;
+  
+  plotId = 'plot_div_' + Math.random().toString(36).substring(2, 9);
+
+  ngAfterViewInit() {
+    this.renderPlot();
+  }
+
+  private renderPlot() {
+    try {
+      // AI returns code assuming target is 'plot_div' or similar generic names.
+      // We replace it with our dynamic ID to support multiple charts.
+      let executableCode = this.code;
+      if (executableCode.includes("'plot_div'")) {
+        executableCode = executableCode.replace(/'plot_div'/g, `'${this.plotId}'`);
+      } else if (executableCode.includes('"plot_div"')) {
+        executableCode = executableCode.replace(/"plot_div"/g, `'${this.plotId}'`);
+      } else {
+        // If the AI didn't specify the div ID properly, we try to catch Plotly.newPlot
+        executableCode = executableCode.replace(/Plotly\.newPlot\([^,]+,/g, `Plotly.newPlot('${this.plotId}',`);
+      }
+      
+      // Make Plotly global for the eval/Function execution
+      (window as any).Plotly = Plotly;
+      
+      const renderFn = new Function('Plotly', executableCode);
+      renderFn(Plotly);
+    } catch (e) {
+      console.error('Failed to render Plotly chart:', e);
+      this.plotContainer.nativeElement.innerHTML = '<div class="text-red-400 p-4 text-sm font-mono">Failed to render visualization.<br>Check console for details.</div>';
+    }
+  }
+}
+
+
+--- FILE: ./src/app/plotly-render/plotly-render.html ---
+<p>plotly-render works!</p>
+
+
+--- FILE: ./src/app/services/auth.spec.ts ---
+import { TestBed } from '@angular/core/testing';
+
+import { Auth } from './auth';
+
+describe('Auth', () => {
+  let service: Auth;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({});
+    service = TestBed.inject(Auth);
+  });
+
+  it('should be created', () => {
+    expect(service).toBeTruthy();
+  });
+});
+
+
+--- FILE: ./src/app/services/auth.ts ---
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { BehaviorSubject, Observable, tap } from 'rxjs';
+import { Router } from '@angular/router';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class AuthService {
+  private readonly API_URL = 'http://localhost:8080/api/auth';
+  private isAuthenticatedSubject = new BehaviorSubject<boolean>(this.hasToken());
+  public isAuthenticated$ = this.isAuthenticatedSubject.asObservable();
+
+  constructor(private http: HttpClient, private router: Router) { }
+
+  private hasToken(): boolean {
+    return !!localStorage.getItem('token');
+  }
+
+  login(credentials: any): Observable<any> {
+    return this.http.post(`${this.API_URL}/login`, credentials).pipe(
+      tap((res: any) => {
+        if (res && res.token) {
+          localStorage.setItem('token', res.token);
+          localStorage.setItem('user', JSON.stringify(res));
+          this.isAuthenticatedSubject.next(true);
+        }
+      })
+    );
+  }
+
+  logout(): void {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    this.isAuthenticatedSubject.next(false);
+    this.router.navigate(['/login']);
+  }
+
+  getToken(): string | null {
+    return localStorage.getItem('token');
+  }
+}
+
+
+--- FILE: ./src/app/services/chat.spec.ts ---
+import { TestBed } from '@angular/core/testing';
+
+import { Chat } from './chat';
+
+describe('Chat', () => {
+  let service: Chat;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({});
+    service = TestBed.inject(Chat);
+  });
+
+  it('should be created', () => {
+    expect(service).toBeTruthy();
+  });
+});
+
+
+--- FILE: ./src/app/services/chat.ts ---
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatResponse {
+  answer: string;
+  data: any[];
+  visualizationCode?: string;
+}
+
+@Injectable({
+  providedIn: 'root'
+})
+export class ChatService {
+  private readonly API_URL = 'http://localhost:8080/api/chat/ask';
+  private chatHistory: ChatMessage[] = [];
+
+  constructor(private http: HttpClient) { }
+
+  getHistory(): ChatMessage[] {
+    return this.chatHistory;
+  }
+
+  addMessage(msg: ChatMessage) {
+    this.chatHistory.push(msg);
+  }
+
+  askQuestion(question: string): Observable<ChatResponse> {
+    const payload = {
+      question: question,
+      chatHistory: this.chatHistory
+    };
+    return this.http.post<ChatResponse>(this.API_URL, payload);
+  }
+}
+
+
+--- FILE: ./src/app/interceptors/auth-interceptor.spec.ts ---
+import { TestBed } from '@angular/core/testing';
+import { HttpInterceptorFn } from '@angular/common/http';
+
+import { authInterceptor } from './auth-interceptor';
+
+describe('authInterceptor', () => {
+  const interceptor: HttpInterceptorFn = (req, next) =>
+    TestBed.runInInjectionContext(() => authInterceptor(req, next));
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({});
+  });
+
+  it('should be created', () => {
+    expect(interceptor).toBeTruthy();
+  });
+});
+
+
+--- FILE: ./src/app/interceptors/auth-interceptor.ts ---
+import { HttpInterceptorFn } from '@angular/common/http';
+import { inject } from '@angular/core';
+import { AuthService } from '../services/auth';
+
+export const authInterceptor: HttpInterceptorFn = (req, next) => {
+  const authService = inject(AuthService);
+  const token = authService.getToken();
+
+  if (token) {
+    const clonedReq = req.clone({
+      headers: req.headers.set('Authorization', `Bearer ${token}`)
+    });
+    return next(clonedReq);
+  }
+
+  return next(req);
+};
+
+
+--- FILE: ./src/app/guards/auth-guard.spec.ts ---
+import { TestBed } from '@angular/core/testing';
+import { CanActivateFn } from '@angular/router';
+
+import { authGuard } from './auth-guard';
+
+describe('authGuard', () => {
+  const executeGuard: CanActivateFn = (...guardParameters) =>
+    TestBed.runInInjectionContext(() => authGuard(...guardParameters));
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({});
+  });
+
+  it('should be created', () => {
+    expect(executeGuard).toBeTruthy();
+  });
+});
+
+
+--- FILE: ./src/app/guards/auth-guard.ts ---
+import { CanActivateFn, Router } from '@angular/router';
+import { inject } from '@angular/core';
+import { AuthService } from '../services/auth';
+
+export const authGuard: CanActivateFn = (route, state) => {
+  const authService = inject(AuthService);
+  const router = inject(Router);
+
+  if (authService.getToken()) {
+    return true;
+  }
+
+  router.navigate(['/login']);
+  return false;
+};
+
+
+--- FILE: ./src/plotly.d.ts ---
+declare module 'plotly.js-dist-min' {
+    const Plotly: any;
+    export = Plotly;
+}
+
+
+--- FILE: ./.postcssrc.json ---
+{
+  "plugins": {
+    "@tailwindcss/postcss": {}
+  }
+}
+
+--- FILE: ./angular.json ---
+{
+  "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
+  "version": 1,
+  "cli": {
+    "packageManager": "pnpm"
+  },
+  "newProjectRoot": "projects",
+  "projects": {
+    "ecommercefrontend": {
+      "projectType": "application",
+      "schematics": {},
+      "root": "",
+      "sourceRoot": "src",
+      "prefix": "app",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "browser": "src/main.ts",
+            "tsConfig": "tsconfig.app.json",
+            "assets": [
+              {
+                "glob": "**/*",
+                "input": "public"
+              }
+            ],
+            "styles": [
+              "src/styles.css"
+            ],
+            "allowedCommonJsDependencies": [
+              "plotly.js-dist-min"
+            ]
+          },
+          "configurations": {
+            "production": {
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "10MB",
+                  "maximumError": "15MB"
+                },
+                {
+                  "type": "anyComponentStyle",
+                  "maximumWarning": "4kB",
+                  "maximumError": "8kB"
+                }
+              ],
+              "outputHashing": "all"
+            },
+            "development": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "serve": {
+          "builder": "@angular/build:dev-server",
+          "configurations": {
+            "production": {
+              "buildTarget": "ecommercefrontend:build:production"
+            },
+            "development": {
+              "buildTarget": "ecommercefrontend:build:development"
+            }
+          },
+          "defaultConfiguration": "development"
+        },
+        "test": {
+          "builder": "@angular/build:unit-test"
+        }
+      }
+    }
+  }
+}
+
+
+--- FILE: ./tsconfig.app.json ---
+/* To learn more about Typescript configuration file: https://www.typescriptlang.org/docs/handbook/tsconfig-json.html. */
+/* To learn more about Angular compiler options: https://angular.dev/reference/configs/angular-compiler-options. */
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./out-tsc/app",
+    "types": []
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "src/**/*.spec.ts"
+  ]
+}
+
+
+--- FILE: ./tsconfig.json ---
+/* To learn more about Typescript configuration file: https://www.typescriptlang.org/docs/handbook/tsconfig-json.html. */
+/* To learn more about Angular compiler options: https://angular.dev/reference/configs/angular-compiler-options. */
+{
+  "compileOnSave": false,
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "experimentalDecorators": true,
+    "importHelpers": true,
+    "target": "ES2022",
+    "module": "preserve"
+  },
+  "angularCompilerOptions": {
+    "enableI18nLegacyMessageIdFormat": false,
+    "strictInjectionParameters": true,
+    "strictInputAccessModifiers": true,
+    "strictTemplates": true
+  },
+  "files": [],
+  "references": [
+    {
+      "path": "./tsconfig.app.json"
+    },
+    {
+      "path": "./tsconfig.spec.json"
+    }
+  ]
+}
+
+
+--- FILE: ./tsconfig.spec.json ---
+/* To learn more about Typescript configuration file: https://www.typescriptlang.org/docs/handbook/tsconfig-json.html. */
+/* To learn more about Angular compiler options: https://angular.dev/reference/configs/angular-compiler-options. */
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./out-tsc/spec",
+    "types": [
+      "vitest/globals"
+    ]
+  },
+  "include": [
+    "src/**/*.d.ts",
+    "src/**/*.spec.ts"
+  ]
+}
+
+
+--- FILE: ./package.json ---
+{
+  "name": "ecommercefrontend",
+  "version": "0.0.0",
+  "scripts": {
+    "ng": "ng",
+    "start": "ng serve",
+    "build": "ng build",
+    "watch": "ng build --watch --configuration development",
+    "test": "ng test"
+  },
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "dependencies": {
+    "@angular/common": "^21.2.0",
+    "@angular/compiler": "^21.2.0",
+    "@angular/core": "^21.2.0",
+    "@angular/forms": "^21.2.0",
+    "@angular/platform-browser": "^21.2.0",
+    "@angular/router": "^21.2.0",
+    "lucide-angular": "^1.0.0",
+    "plotly.js-dist-min": "^3.5.0",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0"
+  },
+  "devDependencies": {
+    "@angular/build": "^21.2.0",
+    "@angular/cli": "^21.2.0",
+    "@angular/compiler-cli": "^21.2.0",
+    "@tailwindcss/postcss": "^4.1.12",
+    "@types/plotly.js": "^3.0.10",
+    "jsdom": "^28.0.0",
+    "postcss": "^8.5.3",
+    "prettier": "^3.8.1",
+    "tailwindcss": "^4.1.12",
+    "typescript": "~5.9.2",
+    "vitest": "^4.0.8"
+  }
+}
