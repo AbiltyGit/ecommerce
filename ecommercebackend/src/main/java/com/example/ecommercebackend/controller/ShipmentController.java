@@ -9,6 +9,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/shipments")
+@org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
 public class ShipmentController {
     private final ShipmentService shipmentService;
     public ShipmentController(ShipmentService shipmentService) { this.shipmentService = shipmentService; }

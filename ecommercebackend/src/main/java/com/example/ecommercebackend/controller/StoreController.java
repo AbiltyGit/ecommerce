@@ -13,6 +13,7 @@ public class StoreController {
     private final StoreService storeService;
     public StoreController(StoreService storeService) { this.storeService = storeService; }
     @PostMapping
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
     public ResponseEntity<StoreResponse> createStore(@RequestBody StoreRequest request) { return new ResponseEntity<>(storeService.createStore(request), HttpStatus.CREATED); }
     @GetMapping("/{id}")
     public ResponseEntity<StoreResponse> getStoreById(@PathVariable Long id) { return ResponseEntity.ok(storeService.getStoreById(id)); }

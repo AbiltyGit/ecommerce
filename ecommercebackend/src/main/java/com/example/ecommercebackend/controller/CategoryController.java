@@ -13,6 +13,7 @@ public class CategoryController {
     private final CategoryService categoryService;
     public CategoryController(CategoryService categoryService) { this.categoryService = categoryService; }
     @PostMapping
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<CategoryResponse> createCategory(@RequestBody CategoryRequest request) { return new ResponseEntity<>(categoryService.createCategory(request), HttpStatus.CREATED); }
     @GetMapping("/{id}")
     public ResponseEntity<CategoryResponse> getCategoryById(@PathVariable Long id) { return ResponseEntity.ok(categoryService.getCategoryById(id)); }

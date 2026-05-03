@@ -13,6 +13,7 @@ public class ReviewController {
     private final ReviewService reviewService;
     public ReviewController(ReviewService reviewService) { this.reviewService = reviewService; }
     @PostMapping
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('INDIVIDUAL')")
     public ResponseEntity<ReviewResponse> createReview(@RequestBody ReviewRequest request) { return new ResponseEntity<>(reviewService.createReview(request), HttpStatus.CREATED); }
     @GetMapping("/{id}")
     public ResponseEntity<ReviewResponse> getReviewById(@PathVariable Long id) { return ResponseEntity.ok(reviewService.getReviewById(id)); }
