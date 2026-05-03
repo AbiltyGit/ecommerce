@@ -11,6 +11,7 @@ import { AdminProducts } from './admin-products/admin-products';
 import { AdminOrders } from './admin-orders/admin-orders';
 import { AdminUsers } from './admin-users/admin-users';
 import { AdminStores } from './admin-stores/admin-stores';
+import { IndividualDashboard } from './individual-dashboard/individual-dashboard';
 import { Shell } from './shell/shell';
 import { authGuard } from './guards/auth-guard';
 import { roleGuard } from './guards/role-guard';
@@ -30,6 +31,7 @@ export const routes: Routes = [
       { path: 'cart', component: CartComponent },
       { path: 'checkout', component: Checkout },
       { path: 'order-history', component: OrderHistory },
+      { path: 'my-dashboard', component: IndividualDashboard },
       { path: 'chat', component: Chat },
 
       // Admin (platform-wide analytics)

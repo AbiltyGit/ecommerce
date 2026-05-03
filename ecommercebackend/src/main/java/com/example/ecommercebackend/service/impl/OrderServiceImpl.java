@@ -1,6 +1,7 @@
 package com.example.ecommercebackend.service.impl;
 import com.example.ecommercebackend.dto.request.OrderRequest;
 import com.example.ecommercebackend.dto.request.OrderItemRequest;
+import com.example.ecommercebackend.dto.response.OrderItemResponse;
 import com.example.ecommercebackend.dto.response.OrderResponse;
 import com.example.ecommercebackend.model.Order;
 import com.example.ecommercebackend.model.OrderItem;
@@ -62,21 +63,25 @@ public class OrderServiceImpl implements OrderService {
         return mapToResponse(saved);
     }
     @Override
+    @Transactional(readOnly = true)
     public OrderResponse getOrderById(Long id) {
         Order order = orderRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Order not found"));
         return mapToResponse(order);
     }
     @Override
+    @Transactional(readOnly = true)
     public List<OrderResponse> getAllOrders() {
         return orderRepository.findAll().stream().map(this::mapToResponse).toList();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<OrderResponse> getOrdersByUserId(Long userId) {
         return orderRepository.findByUserId(userId).stream().map(this::mapToResponse).toList();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<OrderResponse> getOrdersByCorporateUserId(Long corporateUserId) {
         return orderRepository.findOrdersByCorporateUserId(corporateUserId).stream().map(this::mapToResponse).toList();
     }
@@ -91,7 +96,13 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private OrderResponse mapToResponse(Order order) {
-        return new OrderResponse(order.getId(), order.getUser().getId(), order.getUser().getUsername(), order.getOrderDate(), order.getStatus(), order.getPaymentMethod());
+        List<OrderItemResponse> itemResponses = new ArrayList<>();
+        if (order.getItems() != null) {
+            itemResponses = order.getItems().stream()
+                .map(i -> new OrderItemResponse(i.getId(), i.getProduct().getId(), i.getProduct().getName(), i.getQuantity(), i.getUnitPrice()))
+                .toList();
+        }
+        return new OrderResponse(order.getId(), order.getUser().getId(), order.getUser().getUsername(), order.getOrderDate(), order.getStatus(), order.getPaymentMethod(), itemResponses);
     }
 
     @Override

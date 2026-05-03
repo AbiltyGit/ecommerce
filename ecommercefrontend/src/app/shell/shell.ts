@@ -81,6 +81,7 @@ export class Shell implements OnInit {
       default: // INDIVIDUAL
         this.navItems = [
           { label: 'Browse Products', route: '/products',       iconKey: 'products' },
+          { label: 'My Analytics',    route: '/my-dashboard',   iconKey: 'dashboard' },
           { label: 'My Cart',         route: '/cart',           iconKey: 'cart'     },
           { label: 'My Orders',       route: '/order-history',  iconKey: 'history'  },
           { label: 'AI Assistant',    route: '/chat',           iconKey: 'chat'     },
