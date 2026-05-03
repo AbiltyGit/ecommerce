@@ -57,6 +57,8 @@ public class ProductServiceImpl implements ProductService {
         Long storeId = product.getStore() != null ? product.getStore().getId() : null;
         Long catId = product.getCategory() != null ? product.getCategory().getId() : null;
         return new ProductResponse(product.getId(), product.getSku(), product.getName(), product.getDescription(), product.getPrice(), product.getStockQuantity(), storeId, catId);
+    }
+
     @Override
     public ProductResponse updateProduct(Long id, ProductRequest request) {
         Product product = productRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Product not found: " + id));

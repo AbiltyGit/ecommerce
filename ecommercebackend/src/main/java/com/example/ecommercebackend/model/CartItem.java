@@ -1,15 +1,9 @@
 package com.example.ecommercebackend.model;
 
 import jakarta.persistence.*;
-import lombok.*;
 
 @Entity
 @Table(name = "cart_items")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
 public class CartItem {
 
     @Id
@@ -26,4 +20,18 @@ public class CartItem {
 
     @Column(nullable = false)
     private Integer quantity;
+
+    public CartItem() {}
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
+    public Cart getCart() { return cart; }
+    public void setCart(Cart cart) { this.cart = cart; }
+
+    public Product getProduct() { return product; }
+    public void setProduct(Product product) { this.product = product; }
+
+    public Integer getQuantity() { return quantity; }
+    public void setQuantity(Integer quantity) { this.quantity = quantity; }
 }
