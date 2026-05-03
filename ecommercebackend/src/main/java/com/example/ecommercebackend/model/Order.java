@@ -31,6 +31,15 @@ public class Order {
     @OneToOne(mappedBy = "order", cascade = CascadeType.ALL)
     private Shipment shipment;
 
+    @Column(name = "total_amount")
+    private java.math.BigDecimal totalAmount;
+
+    @Column(name = "shipping_address")
+    private String shippingAddress;
+
+    @Column(name = "billing_address")
+    private String billingAddress;
+
     // Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -52,4 +61,13 @@ public class Order {
     
     public Shipment getShipment() { return shipment; }
     public void setShipment(Shipment shipment) { this.shipment = shipment; }
+
+    public java.math.BigDecimal getTotalAmount() { return totalAmount; }
+    public void setTotalAmount(java.math.BigDecimal totalAmount) { this.totalAmount = totalAmount; }
+
+    public String getShippingAddress() { return shippingAddress; }
+    public void setShippingAddress(String shippingAddress) { this.shippingAddress = shippingAddress; }
+
+    public String getBillingAddress() { return billingAddress; }
+    public void setBillingAddress(String billingAddress) { this.billingAddress = billingAddress; }
 }
