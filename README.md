@@ -9,10 +9,10 @@ Sistemi sorunsuz başlatabilmek için bilgisayarınızda kurulu olması gerekenl
 1. **Veritabanı (PostgreSQL veya MySQL)**
    - Bu proje Spring profilleri aracılığıyla hem **PostgreSQL** (`5432` portu) hem de **MySQL** (`3306` portu) desteklemektedir. 
    - `ecommercebackend/src/main/resources/application.properties` dosyası içerisinden `spring.profiles.active=postgres` veya `mysql` olarak geçiş yapabilirsiniz.
-   - En kolay başlatma yöntemi **Docker Compose** kullanmaktır. Terminalde `ecommercebackend` klasörüne girip şu komutu çalıştırarak veritabanlarını container olarak anında ayağa kaldırabilirsiniz:
+   - En kolay başlatma yöntemi **Docker Compose** kullanmaktır. Terminalde `scripts` klasörü altındaki `start_db.sh` veya `start_db.bat` betiğini çalıştırarak veritabanlarını anında ayağa kaldırabilirsiniz.
      \`\`\`bash
-     cd ecommercebackend
-     docker-compose up -d
+     cd scripts
+     ./start_db.sh
      \`\`\`
    - Eğer Docker yerine yerel sisteminize kurulu bir servis kullanıyorsanız, `application-postgres.properties` veya `application-mysql.properties` içerisinden kullanıcı adı/şifre ayarlarını kendi sisteminize göre güncellediğinizden emin olun.
    

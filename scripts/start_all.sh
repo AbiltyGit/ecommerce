@@ -27,12 +27,12 @@ launch_in_terminal() {
 }
 
 # 1. Java Backend
-launch_in_terminal "JAVA-BACKEND" "cd ecommercebackend && ./mvnw spring-boot:run"
+launch_in_terminal "JAVA-BACKEND" "cd ../ecommercebackend && ./mvnw spring-boot:run"
 
 # 2. Python AI Agent
-launch_in_terminal "PYTHON-AI" "cd chatbot && source $PYTHON_VENV/bin/activate && uvicorn main:app --reload"
+launch_in_terminal "PYTHON-AI" "cd ../chatbot && source $PYTHON_VENV/bin/activate && uvicorn main:app --reload"
 
 # 3. Angular Frontend
-launch_in_terminal "ANGULAR-UI" "cd ecommercefrontend && pnpm start"
+launch_in_terminal "ANGULAR-UI" "cd ../ecommercefrontend && pnpm start"
 
 echo "✅ Tüm servisler başlatıldı."
