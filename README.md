@@ -10,10 +10,10 @@ Sistemi sorunsuz başlatabilmek için bilgisayarınızda kurulu olması gerekenl
    - Bu proje Spring profilleri aracılığıyla hem **PostgreSQL** (`5432` portu) hem de **MySQL** (`3306` portu) desteklemektedir. 
    - `ecommercebackend/src/main/resources/application.properties` dosyası içerisinden `spring.profiles.active=postgres` veya `mysql` olarak geçiş yapabilirsiniz.
    - En kolay başlatma yöntemi **Docker Compose** kullanmaktır. Terminalde `scripts` klasörü altındaki `start_db.sh` veya `start_db.bat` betiğini çalıştırarak veritabanlarını anında ayağa kaldırabilirsiniz.
-     \`\`\`bash
+     ```bash
      cd scripts
      ./start_db.sh
-     \`\`\`
+     ```
    - Eğer Docker yerine yerel sisteminize kurulu bir servis kullanıyorsanız, `application-postgres.properties` veya `application-mysql.properties` içerisinden kullanıcı adı/şifre ayarlarını kendi sisteminize göre güncellediğinizden emin olun.
    
 2. **Uygulama Bağımlılıkları**
@@ -23,17 +23,19 @@ Sistemi sorunsuz başlatabilmek için bilgisayarınızda kurulu olması gerekenl
 
 ## 🏃‍♂️ Projeyi Çalıştırma
 
-Projeye ait tüm servisleri elle tek tek çalıştırmak yerine işletim sisteminize uygun olan aşağıdaki otomatik scriptleri kullanabilirsiniz.
+Projeye ait tüm servisleri elle tek tek çalıştırmak yerine işletim sisteminize uygun olan aşağıdaki otomatik scriptleri kullanabilirsiniz. Ana dizinden `scripts` klasörüne girip ilgili betiği çalıştırın.
 
 ### Linux & MacOS İçin
 ```bash
-chmod +x start_all.sh
+cd scripts
+chmod +x start_all.sh start_db.sh
 ./start_all.sh
 ```
 *(Not: Bu script sisteminizdeki terminali (gnome-terminal, konsole, xterm vb.) otomatik algılar ve mikro-servisleri ayrı sekmelerde/pencerelerde başlatır.)*
 
 ### Windows İçin
 ```cmd
+cd scripts
 start_all.bat
 ```
 *(Not: Bu script 3 ayrı CMD penceresi açarak backend, frontend ve AI servislerini eş zamanlı olarak başlatır.)*
