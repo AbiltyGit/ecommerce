@@ -1,0 +1,74 @@
+<div class="flex h-screen overflow-hidden w-full bg-slate-900/40 items-center justify-center py-10 px-4">
+  <div class="w-full max-w-4xl glass-card rounded-2xl border border-white/5 shadow-2xl flex flex-col h-full animate-fade-in">
+    
+    <!-- Header -->
+    <header class="p-6 border-b border-white/5 flex items-center justify-between shrink-0">
+      <div class="flex items-center gap-4">
+        <button (click)="goBack()" class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+        </button>
+        <div>
+          <h1 class="text-2xl font-bold text-white tracking-tight">Purchase History</h1>
+          <p class="text-sm text-slate-400">View and track your past orders</p>
+        </div>
+      </div>
+      <button (click)="logout()" class="px-4 py-2 rounded-lg hover:bg-red-500/10 hover:text-red-400 text-slate-400 font-medium transition-colors text-sm">
+        Sign Out
+      </button>
+    </header>
+
+    <!-- Main Content -->
+    <div class="flex-1 overflow-y-auto p-6 md:p-8">
+      
+      <div *ngIf="loading" class="flex flex-col items-center justify-center h-full text-indigo-400">
+        <div class="w-10 h-10 rounded-full border-4 border-indigo-500/30 border-t-indigo-500 animate-spin mb-4"></div>
+        Loading orders...
+      </div>
+
+      <div *ngIf="!loading && orders.length === 0" class="flex flex-col items-center justify-center h-full text-slate-400 py-20">
+        <div class="w-20 h-20 rounded-full bg-slate-800/50 flex items-center justify-center mb-4">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+        </div>
+        <p class="text-lg mb-2">You haven't placed any orders yet.</p>
+        <button (click)="goBack()" class="text-indigo-400 hover:text-indigo-300 font-medium">Start Shopping</button>
+      </div>
+
+      <div *ngIf="!loading && orders.length > 0" class="space-y-4">
+        
+        <div *ngFor="let order of orders" class="glass-panel p-6 rounded-xl border border-white/5 hover:border-indigo-500/20 transition-colors">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+            
+            <div class="flex items-center gap-4">
+              <div class="w-12 h-12 rounded-lg bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
+              </div>
+              <div>
+                <div class="text-xs text-slate-500 uppercase tracking-wider font-semibold">Order #{{ order.id }}</div>
+                <div class="text-lg font-bold text-white">{{ order.orderDate | date:'medium' }}</div>
+              </div>
+            </div>
+
+            <div class="flex flex-col items-end">
+              <span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-1 border"
+                    [ngClass]="{
+                      'bg-yellow-500/10 text-yellow-500 border-yellow-500/20': order.status === 'PENDING',
+                      'bg-indigo-500/10 text-indigo-400 border-indigo-500/20': order.status === 'PROCESSING',
+                      'bg-blue-500/10 text-blue-400 border-blue-500/20': order.status === 'SHIPPED',
+                      'bg-green-500/10 text-green-400 border-green-500/20': order.status === 'DELIVERED',
+                      'bg-red-500/10 text-red-400 border-red-500/20': order.status === 'CANCELLED'
+                    }">
+                {{ order.status }}
+              </span>
+              <div class="text-xs text-slate-500 flex items-center gap-1">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+                {{ order.paymentMethod }}
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>

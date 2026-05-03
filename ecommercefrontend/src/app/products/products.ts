@@ -108,6 +108,10 @@ export class Products implements OnInit {
     this.router.navigate(['/cart']);
   }
 
+  goToOrders() {
+    this.router.navigate(['/order-history']);
+  }
+
   logout() {
     this.authService.logout();
   }

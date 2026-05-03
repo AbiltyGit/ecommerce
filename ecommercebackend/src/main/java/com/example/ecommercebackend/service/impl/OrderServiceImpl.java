@@ -70,6 +70,12 @@ public class OrderServiceImpl implements OrderService {
     public List<OrderResponse> getAllOrders() {
         return orderRepository.findAll().stream().map(this::mapToResponse).toList();
     }
+
+    @Override
+    public List<OrderResponse> getOrdersByUserId(Long userId) {
+        return orderRepository.findByUserId(userId).stream().map(this::mapToResponse).toList();
+    }
+
     private OrderResponse mapToResponse(Order order) {
         return new OrderResponse(order.getId(), order.getUser().getId(), order.getOrderDate(), order.getStatus(), order.getPaymentMethod());
     }

@@ -5,6 +5,7 @@ import { Dashboard } from './dashboard/dashboard';
 import { Products } from './products/products';
 import { CartComponent } from './cart/cart';
 import { Checkout } from './checkout/checkout';
+import { OrderHistory } from './order-history/order-history';
 import { AdminDashboard } from './admin-dashboard/admin-dashboard';
 import { AdminProducts } from './admin-products/admin-products';
 import { authGuard } from './guards/auth-guard';
@@ -17,6 +18,7 @@ export const routes: Routes = [
   { path: 'products', component: Products, canActivate: [authGuard] },
   { path: 'cart', component: CartComponent, canActivate: [authGuard] },
   { path: 'checkout', component: Checkout, canActivate: [authGuard] },
+  { path: 'order-history', component: OrderHistory, canActivate: [authGuard] },
   { path: 'admin/dashboard', component: AdminDashboard, canActivate: [authGuard, roleGuard], data: { expectedRoles: ['ADMIN', 'CORPORATE'] } },
   { path: 'admin/products', component: AdminProducts, canActivate: [authGuard, roleGuard], data: { expectedRoles: ['ADMIN', 'CORPORATE'] } },
   { path: '', redirectTo: '/login', pathMatch: 'full' },
