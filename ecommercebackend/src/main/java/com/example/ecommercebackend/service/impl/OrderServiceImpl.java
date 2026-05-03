@@ -73,4 +73,20 @@ public class OrderServiceImpl implements OrderService {
     private OrderResponse mapToResponse(Order order) {
         return new OrderResponse(order.getId(), order.getUser().getId(), order.getOrderDate(), order.getStatus(), order.getPaymentMethod());
     }
+
+    @Override
+    @Transactional
+    public OrderResponse updateOrder(Long id, OrderRequest request) {
+        Order order = orderRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Order not found: " + id));
+        order.setPaymentMethod(request.paymentMethod());
+        Order saved = orderRepository.save(order);
+        return mapToResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public void deleteOrder(Long id) {
+        Order order = orderRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Order not found: " + id));
+        orderRepository.delete(order);
+    }
 }

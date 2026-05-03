@@ -69,6 +69,18 @@ public class DashboardController {
             );
             stats.put("topCategories", topCats);
 
+            // KPI: Total Revenue
+            List<Map<String, Object>> revenue = queryExecutionService.executeReadOnlyQuery(
+                "SELECT SUM(total_amount) AS total FROM orders"
+            );
+            stats.put("totalRevenue", revenue.get(0).get("total"));
+
+            // Alert: Low Stock Products
+            List<Map<String, Object>> lowStock = queryExecutionService.executeReadOnlyQuery(
+                "SELECT name, stock_quantity FROM products WHERE stock_quantity < 10 ORDER BY stock_quantity ASC LIMIT 10"
+            );
+            stats.put("lowStockAlerts", lowStock);
+
         } catch (Exception e) {
             stats.put("error", "Failed to fetch some stats: " + e.getMessage());
         }

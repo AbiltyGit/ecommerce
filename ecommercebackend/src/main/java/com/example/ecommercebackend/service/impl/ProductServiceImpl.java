@@ -57,5 +57,29 @@ public class ProductServiceImpl implements ProductService {
         Long storeId = product.getStore() != null ? product.getStore().getId() : null;
         Long catId = product.getCategory() != null ? product.getCategory().getId() : null;
         return new ProductResponse(product.getId(), product.getSku(), product.getName(), product.getDescription(), product.getPrice(), product.getStockQuantity(), storeId, catId);
+    @Override
+    public ProductResponse updateProduct(Long id, ProductRequest request) {
+        Product product = productRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Product not found: " + id));
+        product.setSku(request.sku());
+        product.setName(request.name());
+        product.setDescription(request.description());
+        product.setPrice(request.price());
+        product.setStockQuantity(request.stockQuantity());
+        if (request.storeId() != null) {
+            Store store = storeRepository.findById(request.storeId()).orElseThrow(() -> new ResourceNotFoundException("Store not found"));
+            product.setStore(store);
+        }
+        if (request.categoryId() != null) {
+            Category category = categoryRepository.findById(request.categoryId()).orElseThrow(() -> new ResourceNotFoundException("Category not found"));
+            product.setCategory(category);
+        }
+        Product saved = productRepository.save(product);
+        return mapToResponse(saved);
+    }
+    
+    @Override
+    public void deleteProduct(Long id) {
+        Product product = productRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Product not found: " + id));
+        productRepository.delete(product);
     }
 }
