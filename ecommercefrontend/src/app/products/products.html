@@ -1,0 +1,60 @@
+<div class="flex flex-col h-full overflow-y-auto bg-slate-900/40">
+
+  <!-- Header -->
+  <header class="h-14 glass-panel border-b border-white/5 flex items-center justify-between px-6 shrink-0 sticky top-0 z-10">
+    <h1 class="text-base font-semibold text-white flex items-center gap-2">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/></svg>
+      Product Catalog
+    </h1>
+    <span class="text-sm text-slate-400">{{ filteredProducts.length }} products</span>
+  </header>
+
+  <!-- Filters bar -->
+  <div class="p-4 glass-panel border-b border-white/5 flex flex-wrap gap-3">
+    <input type="text" [(ngModel)]="searchQuery" (input)="applyFilters()"
+           class="glass-input px-3 py-2 rounded-lg text-sm flex-1 min-w-40" placeholder="Search products...">
+    <select [(ngModel)]="selectedCategoryId" (change)="applyFilters()"
+            class="glass-input px-3 py-2 rounded-lg text-sm">
+      <option value="">All Categories</option>
+      <option *ngFor="let cat of categories" [value]="cat.id">{{ cat.name }}</option>
+    </select>
+    <select [(ngModel)]="sortBy" (change)="applyFilters()"
+            class="glass-input px-3 py-2 rounded-lg text-sm">
+      <option value="newest">Newest</option>
+      <option value="price_asc">Price ↑</option>
+      <option value="price_desc">Price ↓</option>
+    </select>
+  </div>
+
+  <!-- Grid -->
+  <div class="p-6 flex-1">
+    <div *ngIf="filteredProducts.length === 0" class="flex flex-col items-center justify-center h-full text-slate-500 py-20">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="mb-4 opacity-40"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <p>No products found.</p>
+      <button (click)="searchQuery=''; selectedCategoryId=''; sortBy='newest'; applyFilters()" class="mt-3 text-indigo-400 text-sm">Clear filters</button>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+      <div *ngFor="let product of filteredProducts"
+           class="glass-card rounded-2xl overflow-hidden border border-white/5 flex flex-col group hover:border-indigo-500/30 transition-all duration-300 animate-fade-in shadow-lg">
+        <div class="h-40 bg-slate-800/50 relative overflow-hidden flex items-center justify-center group-hover:bg-slate-800/80 transition-colors">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          <div class="absolute top-3 right-3 bg-indigo-500 text-white text-xs font-bold px-2 py-1 rounded shadow-md">${{ product.price }}</div>
+        </div>
+        <div class="p-4 flex-1 flex flex-col">
+          <div class="text-xs text-indigo-400 font-medium mb-1">{{ product.category?.name || 'Uncategorized' }}</div>
+          <h3 class="text-base font-bold text-white mb-1 line-clamp-1">{{ product.name }}</h3>
+          <p class="text-xs text-slate-400 line-clamp-2 flex-1">{{ product.description }}</p>
+          <div class="mt-3 pt-3 border-t border-white/5 flex items-center justify-between">
+            <span class="text-xs text-slate-500">Stock: {{ product.stockQuantity }}</span>
+            <button (click)="addToCart(product.id)"
+                    class="bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              Add
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,64 @@
+<div class="flex h-screen overflow-hidden w-full">
+
+  <!-- ─── Sidebar ─────────────────────────────────── -->
+  <aside class="w-60 glass-panel border-r border-white/5 flex flex-col h-full shrink-0 z-20">
+
+    <!-- Brand -->
+    <div class="p-5 border-b border-white/5 flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 shrink-0">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+        </svg>
+      </div>
+      <div class="overflow-hidden">
+        <p class="text-sm font-bold text-white tracking-tight leading-tight truncate">AI Commerce</p>
+        <span class="text-xs px-2 py-0.5 rounded-full border font-medium" [class]="getRoleBadgeClass()">
+          {{ getRoleLabel() }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Nav -->
+    <nav class="flex-1 overflow-y-auto p-3 space-y-0.5">
+      <a *ngFor="let item of navItems"
+         [routerLink]="item.route"
+         class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 cursor-pointer"
+         [ngClass]="isActive(item.route)
+           ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shadow-sm'
+           : 'text-slate-400 hover:bg-white/5 hover:text-slate-200 border border-transparent'">
+        <!-- Icon rendered via innerHTML of a wrapper span -->
+        <span class="w-5 h-5 shrink-0 flex items-center justify-center [&>svg]:w-full [&>svg]:h-full"
+              [innerHTML]="icon(item.iconKey)"></span>
+        {{ item.label }}
+      </a>
+    </nav>
+
+    <!-- User footer -->
+    <div class="p-3 border-t border-white/5">
+      <div class="flex items-center gap-3 px-3 py-2 mb-1">
+        <div class="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-300 font-bold text-sm border border-indigo-500/20 shrink-0">
+          {{ (username || '?')[0] | uppercase }}
+        </div>
+        <div class="overflow-hidden">
+          <p class="text-sm font-medium text-white truncate">{{ username }}</p>
+          <p class="text-xs text-slate-500">ID #{{ userId }}</p>
+        </div>
+      </div>
+      <button (click)="logout()"
+              class="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-colors font-medium">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16 17 21 12 16 7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+        Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <!-- ─── Page Content ──────────────────────────────── -->
+  <main class="flex-1 overflow-hidden bg-slate-900/30">
+    <router-outlet></router-outlet>
+  </main>
+
+</div>

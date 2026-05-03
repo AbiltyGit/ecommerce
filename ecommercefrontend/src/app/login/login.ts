@@ -25,11 +25,11 @@ export class Login {
     this.authService.login({ username: this.username, password: this.password }).subscribe({
       next: (res) => {
         const user = JSON.parse(localStorage.getItem('user') || '{}');
-        const roles = user.roles || [];
-        
-        if (roles.includes('ADMIN')) {
+        const role = user.role;
+
+        if (role === 'ADMIN') {
           this.router.navigate(['/dashboard']);
-        } else if (roles.includes('CORPORATE')) {
+        } else if (role === 'CORPORATE') {
           this.router.navigate(['/admin/dashboard']);
         } else {
           this.router.navigate(['/products']);

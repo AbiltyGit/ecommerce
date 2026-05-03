@@ -11,22 +11,74 @@ import { AdminProducts } from './admin-products/admin-products';
 import { AdminOrders } from './admin-orders/admin-orders';
 import { AdminUsers } from './admin-users/admin-users';
 import { AdminStores } from './admin-stores/admin-stores';
+import { Shell } from './shell/shell';
 import { authGuard } from './guards/auth-guard';
 import { roleGuard } from './guards/role-guard';
 
 export const routes: Routes = [
+  // Public route
   { path: 'login', component: Login },
-  { path: 'chat', component: Chat, canActivate: [authGuard] },
-  { path: 'dashboard', component: Dashboard, canActivate: [authGuard, roleGuard], data: { expectedRoles: ['ADMIN'] } },
-  { path: 'products', component: Products, canActivate: [authGuard] },
-  { path: 'cart', component: CartComponent, canActivate: [authGuard] },
-  { path: 'checkout', component: Checkout, canActivate: [authGuard] },
-  { path: 'order-history', component: OrderHistory, canActivate: [authGuard] },
-  { path: 'admin/dashboard', component: AdminDashboard, canActivate: [authGuard, roleGuard], data: { expectedRoles: ['ADMIN', 'CORPORATE'] } },
-  { path: 'admin/products', component: AdminProducts, canActivate: [authGuard, roleGuard], data: { expectedRoles: ['ADMIN', 'CORPORATE'] } },
-  { path: 'admin/orders', component: AdminOrders, canActivate: [authGuard, roleGuard], data: { expectedRoles: ['ADMIN', 'CORPORATE'] } },
-  { path: 'admin/users', component: AdminUsers, canActivate: [authGuard, roleGuard], data: { expectedRoles: ['ADMIN'] } },
-  { path: 'admin/stores', component: AdminStores, canActivate: [authGuard, roleGuard], data: { expectedRoles: ['ADMIN'] } },
-  { path: '', redirectTo: '/login', pathMatch: 'full' },
+
+  // Authenticated shell — all protected routes live here as children
+  {
+    path: '',
+    component: Shell,
+    canActivate: [authGuard],
+    children: [
+      // Individual
+      { path: 'products', component: Products },
+      { path: 'cart', component: CartComponent },
+      { path: 'checkout', component: Checkout },
+      { path: 'order-history', component: OrderHistory },
+      { path: 'chat', component: Chat },
+
+      // Admin (platform-wide analytics)
+      {
+        path: 'dashboard',
+        component: Dashboard,
+        canActivate: [roleGuard],
+        data: { expectedRoles: ['ADMIN'] }
+      },
+
+      // Corporate + Admin shared panels
+      {
+        path: 'admin/dashboard',
+        component: AdminDashboard,
+        canActivate: [roleGuard],
+        data: { expectedRoles: ['ADMIN', 'CORPORATE'] }
+      },
+      {
+        path: 'admin/products',
+        component: AdminProducts,
+        canActivate: [roleGuard],
+        data: { expectedRoles: ['ADMIN', 'CORPORATE'] }
+      },
+      {
+        path: 'admin/orders',
+        component: AdminOrders,
+        canActivate: [roleGuard],
+        data: { expectedRoles: ['ADMIN', 'CORPORATE'] }
+      },
+
+      // Admin-only panels
+      {
+        path: 'admin/users',
+        component: AdminUsers,
+        canActivate: [roleGuard],
+        data: { expectedRoles: ['ADMIN'] }
+      },
+      {
+        path: 'admin/stores',
+        component: AdminStores,
+        canActivate: [roleGuard],
+        data: { expectedRoles: ['ADMIN'] }
+      },
+
+      // Default redirect for authenticated users
+      { path: '', redirectTo: 'products', pathMatch: 'full' },
+    ]
+  },
+
+  // Catch-all
   { path: '**', redirectTo: '/login' }
 ];
