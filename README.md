@@ -6,12 +6,15 @@ Bu proje; Spring Boot, Angular ve Python (LangChain/FastAPI) tabanlı "çok-katm
 
 Sistemi sorunsuz başlatabilmek için bilgisayarınızda kurulu olması gerekenler:
 
-1. **PostgreSQL Veritabanı (ÖNEMLİ!)**
-   - Sistem `5432` portunda çalışan bir PostgreSQL sunucusuna ihtiyaç duyar.
-   - Başlatmadan önce PostgreSQL servisinizin **kesinlikle çalışır durumda** olduğundan emin olun.
-   - Linux: `sudo systemctl start postgresql`
-   - MacOS (Brew): `brew services start postgresql`
-   - Gerekirse `ecommercebackend/src/main/resources/application.properties` dosyasındaki veritabanı kullanıcı adı ve şifresini kendinize göre güncelleyin.
+1. **Veritabanı (PostgreSQL veya MySQL)**
+   - Bu proje Spring profilleri aracılığıyla hem **PostgreSQL** (`5432` portu) hem de **MySQL** (`3306` portu) desteklemektedir. 
+   - `ecommercebackend/src/main/resources/application.properties` dosyası içerisinden `spring.profiles.active=postgres` veya `mysql` olarak geçiş yapabilirsiniz.
+   - En kolay başlatma yöntemi **Docker Compose** kullanmaktır. Terminalde `ecommercebackend` klasörüne girip şu komutu çalıştırarak veritabanlarını container olarak anında ayağa kaldırabilirsiniz:
+     \`\`\`bash
+     cd ecommercebackend
+     docker-compose up -d
+     \`\`\`
+   - Eğer Docker yerine yerel sisteminize kurulu bir servis kullanıyorsanız, `application-postgres.properties` veya `application-mysql.properties` içerisinden kullanıcı adı/şifre ayarlarını kendi sisteminize göre güncellediğinizden emin olun.
    
 2. **Uygulama Bağımlılıkları**
    - **Java (JDK 21+)**
