@@ -5,6 +5,8 @@ import { Dashboard } from './dashboard/dashboard';
 import { Products } from './products/products';
 import { CartComponent } from './cart/cart';
 import { Checkout } from './checkout/checkout';
+import { AdminDashboard } from './admin-dashboard/admin-dashboard';
+import { AdminProducts } from './admin-products/admin-products';
 import { authGuard } from './guards/auth-guard';
 
 export const routes: Routes = [
@@ -14,6 +16,8 @@ export const routes: Routes = [
   { path: 'products', component: Products, canActivate: [authGuard] },
   { path: 'cart', component: CartComponent, canActivate: [authGuard] },
   { path: 'checkout', component: Checkout, canActivate: [authGuard] },
+  { path: 'admin/dashboard', component: AdminDashboard, canActivate: [authGuard] },
+  { path: 'admin/products', component: AdminProducts, canActivate: [authGuard] },
   { path: '', redirectTo: '/login', pathMatch: 'full' },
   { path: '**', redirectTo: '/login' }
 ];
