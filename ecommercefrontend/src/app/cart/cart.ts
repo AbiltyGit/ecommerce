@@ -1,50 +1,51 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { RouterModule, Router } from '@angular/router';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-cart',
   standalone: true,
-  imports: [CommonModule, RouterModule],
-  template: `
-    <div class="cart-container">
-      <h2>Shopping Cart</h2>
-      <div *ngIf="cart?.items?.length === 0">Your cart is empty.</div>
-      <div *ngFor="let item of cart?.items" class="cart-item">
-        <span>Product ID: {{ item.product.id }}</span>
-        <span>Quantity: {{ item.quantity }}</span>
-        <button (click)="removeItem(item.id)">Remove</button>
-      </div>
-      <button *ngIf="cart?.items?.length > 0" (click)="checkout()">Proceed to Checkout</button>
-    </div>
-  `,
-  styles: [`
-    .cart-container { padding: 20px; }
-    .cart-item { display: flex; justify-content: space-between; margin-bottom: 10px; padding: 10px; border: 1px solid #eee; }
-    button { background: #e74c3c; color: white; border: none; padding: 8px 16px; cursor: pointer; }
-  `]
+  imports: [CommonModule],
+  templateUrl: './cart.html'
 })
-export class CartComponent {
-  cart: any;
+export class CartComponent implements OnInit {
+  cart: any = null;
+  loading = true;
+  userId = 0;
+  removingId: number | null = null;
 
   constructor(private http: HttpClient, private router: Router) {}
 
   ngOnInit() {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try { this.userId = JSON.parse(userStr).id; } catch (e) {}
+    }
+    if (!this.userId) { this.router.navigate(['/login']); return; }
     this.loadCart();
   }
 
   loadCart() {
-    this.http.get<any>('/api/carts/user/1').subscribe(data => {
-      this.cart = data;
+    this.loading = true;
+    this.http.get<any>(`/api/carts/user/${this.userId}`).subscribe({
+      next: (data) => { this.cart = data; this.loading = false; },
+      error: () => { this.cart = null; this.loading = false; }
     });
   }
 
   removeItem(itemId: number) {
-    this.http.delete(`/api/carts/user/1/remove/${itemId}`).subscribe(() => this.loadCart());
+    this.removingId = itemId;
+    this.http.delete(`/api/carts/user/${this.userId}/remove/${itemId}`).subscribe({
+      next: () => { this.removingId = null; this.loadCart(); },
+      error: () => { this.removingId = null; }
+    });
   }
 
-  checkout() {
-    this.router.navigate(['/checkout']);
+  get totalPrice(): number {
+    if (!this.cart?.items) return 0;
+    return this.cart.items.reduce((sum: number, item: any) => sum + (item.product?.price || 0) * item.quantity, 0);
   }
+
+  checkout() { this.router.navigate(['/checkout']); }
 }
