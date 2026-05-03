@@ -23,8 +23,17 @@ export class Login {
     this.error = '';
     
     this.authService.login({ username: this.username, password: this.password }).subscribe({
-      next: () => {
-        this.router.navigate(['/chat']);
+      next: (res) => {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const roles = user.roles || [];
+        
+        if (roles.includes('ADMIN')) {
+          this.router.navigate(['/dashboard']);
+        } else if (roles.includes('CORPORATE')) {
+          this.router.navigate(['/admin/dashboard']);
+        } else {
+          this.router.navigate(['/products']);
+        }
       },
       error: (err) => {
         this.error = 'Invalid credentials or connection error.';
