@@ -19,6 +19,7 @@ public class RefreshTokenService {
         this.refreshTokenRepository = refreshTokenRepository; this.userRepository = userRepository;
     }
     public Optional<RefreshToken> findByToken(String token) { return refreshTokenRepository.findByToken(token); }
+    @Transactional
     public RefreshToken createRefreshToken(Long userId) {
         // Delete any existing token for this user to avoid unique constraint violations
         refreshTokenRepository.deleteByUserId(userId);
