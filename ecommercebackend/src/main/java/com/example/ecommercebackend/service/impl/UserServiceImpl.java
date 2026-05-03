@@ -31,6 +31,11 @@ public class UserServiceImpl implements UserService {
     public List<UserResponse> getAllUsers() {
         return userRepository.findAll().stream().map(this::mapToResponse).toList();
     }
+    @Override
+    public void deleteUser(Long id) {
+        User user = userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User not found: " + id));
+        userRepository.delete(user);
+    }
     private UserResponse mapToResponse(User user) {
         return new UserResponse(user.getId(), user.getUsername(), user.getEmail(), user.getRole(), user.getCreatedAt());
     }

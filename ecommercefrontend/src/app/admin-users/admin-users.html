@@ -1,0 +1,94 @@
+<div class="flex h-screen overflow-hidden w-full bg-slate-900/40">
+
+  <!-- Sidebar -->
+  <aside class="w-64 glass-panel border-r border-white/5 flex flex-col h-full hidden md:flex shrink-0">
+    <div class="p-6 border-b border-white/5 flex items-center gap-3">
+      <div class="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <h2 class="text-xl font-bold text-white tracking-tight">User Admin</h2>
+    </div>
+    <div class="flex-1 p-4 space-y-1">
+      <button (click)="goBack()" class="w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 text-slate-400 font-medium transition-all flex items-center gap-3">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+        Dashboard
+      </button>
+      <button class="w-full text-left px-4 py-3 rounded-xl bg-red-500/20 text-red-300 font-medium border border-red-500/30 flex items-center gap-3 transition-all shadow-sm">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        Users
+      </button>
+    </div>
+    <div class="p-4 border-t border-white/5">
+      <button (click)="logout()" class="w-full py-3 px-4 rounded-xl hover:bg-red-500/10 hover:text-red-400 text-slate-400 font-medium transition-colors flex items-center gap-3 justify-center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="flex-1 flex flex-col h-full overflow-y-auto">
+    <header class="h-16 glass-panel border-b border-white/5 flex items-center justify-between px-6 z-10 shrink-0 sticky top-0">
+      <h1 class="text-lg font-semibold text-white flex items-center gap-2">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        User Management
+      </h1>
+      <span class="text-sm text-slate-400">{{ users.length }} registered users</span>
+    </header>
+
+    <div class="p-6 md:p-8">
+
+      <div *ngIf="loading" class="flex flex-col items-center justify-center py-20 text-indigo-400">
+        <div class="w-10 h-10 rounded-full border-4 border-indigo-500/30 border-t-indigo-500 animate-spin mb-4"></div>
+        Loading users...
+      </div>
+
+      <div *ngIf="!loading" class="glass-card rounded-2xl border border-white/5 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm text-left">
+            <thead>
+              <tr class="border-b border-white/5 bg-slate-800/30">
+                <th class="px-6 py-4 text-xs text-slate-400 uppercase tracking-wider font-semibold">ID</th>
+                <th class="px-6 py-4 text-xs text-slate-400 uppercase tracking-wider font-semibold">User</th>
+                <th class="px-6 py-4 text-xs text-slate-400 uppercase tracking-wider font-semibold">Email</th>
+                <th class="px-6 py-4 text-xs text-slate-400 uppercase tracking-wider font-semibold">Role</th>
+                <th class="px-6 py-4 text-xs text-slate-400 uppercase tracking-wider font-semibold">Joined</th>
+                <th class="px-6 py-4 text-xs text-slate-400 uppercase tracking-wider font-semibold">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-white/5">
+              <tr *ngFor="let user of users" class="hover:bg-white/[0.02] transition-colors animate-fade-in">
+                <td class="px-6 py-4 text-slate-500 font-mono text-xs">#{{ user.id }}</td>
+                <td class="px-6 py-4">
+                  <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-300 font-bold text-sm">
+                      {{ (user.username || '?')[0] | uppercase }}
+                    </div>
+                    <span class="font-medium text-white">{{ user.username }}</span>
+                  </div>
+                </td>
+                <td class="px-6 py-4 text-slate-400">{{ user.email }}</td>
+                <td class="px-6 py-4">
+                  <span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border" [class]="getRoleClass(user.role)">
+                    {{ user.role }}
+                  </span>
+                </td>
+                <td class="px-6 py-4 text-slate-500 text-xs">{{ user.createdAt | date:'dd MMM yyyy' }}</td>
+                <td class="px-6 py-4">
+                  <button *ngIf="deletingId !== user.id"
+                          (click)="deleteUser(user)"
+                          class="px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-medium transition-colors border border-red-500/20 flex items-center gap-1">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="m19 6-.867 12.142A2 2 0 0 1 16.138 20H7.862a2 2 0 0 1-1.995-1.858L5 6m5 0V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2"/></svg>
+                    Delete
+                  </button>
+                  <div *ngIf="deletingId === user.id" class="w-5 h-5 rounded-full border-2 border-red-500/30 border-t-red-500 animate-spin"></div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>

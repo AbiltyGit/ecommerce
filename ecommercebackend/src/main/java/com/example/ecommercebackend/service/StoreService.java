@@ -6,4 +6,5 @@ public interface StoreService {
     StoreResponse createStore(StoreRequest request);
     StoreResponse getStoreById(Long id);
     List<StoreResponse> getAllStores();
+    StoreResponse toggleStoreStatus(Long id);
 }

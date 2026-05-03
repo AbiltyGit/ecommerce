@@ -34,6 +34,8 @@ export class AdminDashboard implements OnInit {
 
   goToProducts() { this.router.navigate(['/admin/products']); }
   goToOrders() { this.router.navigate(['/admin/orders']); }
+  goToUsers() { this.router.navigate(['/admin/users']); }
+  goToStores() { this.router.navigate(['/admin/stores']); }
   goToChat() { this.router.navigate(['/chat']); }
   logout() { this.authService.logout(); }
 }

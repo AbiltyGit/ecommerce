@@ -19,4 +19,7 @@ public class StoreController {
     public ResponseEntity<StoreResponse> getStoreById(@PathVariable Long id) { return ResponseEntity.ok(storeService.getStoreById(id)); }
     @GetMapping
     public ResponseEntity<List<StoreResponse>> getAllStores() { return ResponseEntity.ok(storeService.getAllStores()); }
+    @PatchMapping("/{id}/toggle")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<StoreResponse> toggleStoreStatus(@PathVariable Long id) { return ResponseEntity.ok(storeService.toggleStoreStatus(id)); }
 }

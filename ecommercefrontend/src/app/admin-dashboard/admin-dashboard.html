@@ -25,6 +25,14 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
         Orders
       </button>
+      <button (click)="goToUsers()" class="w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 text-slate-400 font-medium transition-all flex items-center gap-3">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Users
+      </button>
+      <button (click)="goToStores()" class="w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 text-slate-400 font-medium transition-all flex items-center gap-3">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Stores
+      </button>
     </div>
     <div class="p-4 border-t border-white/5">
       <button (click)="logout()" class="w-full py-3 px-4 rounded-xl hover:bg-red-500/10 hover:text-red-400 text-slate-400 font-medium transition-colors flex items-center gap-3 justify-center">
@@ -155,6 +163,30 @@
             <div>
               <h3 class="text-lg font-semibold text-white">Manage Products</h3>
               <p class="text-sm text-slate-400">Add, edit, and remove product listings</p>
+            </div>
+          </div>
+        </button>
+
+        <button (click)="goToUsers()" class="glass-card rounded-2xl p-6 border border-white/5 hover:border-red-500/30 transition-all text-left group">
+          <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-red-500/10 flex items-center justify-center border border-red-500/20 group-hover:bg-red-500/20 transition-colors">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </div>
+            <div>
+              <h3 class="text-lg font-semibold text-white">User Management</h3>
+              <p class="text-sm text-slate-400">View, manage, and remove platform users</p>
+            </div>
+          </div>
+        </button>
+
+        <button (click)="goToStores()" class="glass-card rounded-2xl p-6 border border-white/5 hover:border-green-500/30 transition-all text-left group">
+          <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center border border-green-500/20 group-hover:bg-green-500/20 transition-colors">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            </div>
+            <div>
+              <h3 class="text-lg font-semibold text-white">Store Approval</h3>
+              <p class="text-sm text-slate-400">Open or close stores across the platform</p>
             </div>
           </div>
         </button>

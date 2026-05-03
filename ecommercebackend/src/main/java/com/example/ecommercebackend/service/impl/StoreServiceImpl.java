@@ -27,5 +27,10 @@ public class StoreServiceImpl implements StoreService {
     }
     public StoreResponse getStoreById(Long id) { return mapToResponse(storeRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Store not found"))); }
     public List<StoreResponse> getAllStores() { return storeRepository.findAll().stream().map(this::mapToResponse).toList(); }
+    public StoreResponse toggleStoreStatus(Long id) {
+        Store store = storeRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Store not found: " + id));
+        store.setOpen(!store.isOpen());
+        return mapToResponse(storeRepository.save(store));
+    }
     private StoreResponse mapToResponse(Store store) { return new StoreResponse(store.getId(), store.getName(), store.getDescription(), store.isOpen(), store.getCorporateUser() != null ? store.getCorporateUser().getId() : null); }
 }

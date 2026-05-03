@@ -9,6 +9,8 @@ import { OrderHistory } from './order-history/order-history';
 import { AdminDashboard } from './admin-dashboard/admin-dashboard';
 import { AdminProducts } from './admin-products/admin-products';
 import { AdminOrders } from './admin-orders/admin-orders';
+import { AdminUsers } from './admin-users/admin-users';
+import { AdminStores } from './admin-stores/admin-stores';
 import { authGuard } from './guards/auth-guard';
 import { roleGuard } from './guards/role-guard';
 
@@ -23,6 +25,8 @@ export const routes: Routes = [
   { path: 'admin/dashboard', component: AdminDashboard, canActivate: [authGuard, roleGuard], data: { expectedRoles: ['ADMIN', 'CORPORATE'] } },
   { path: 'admin/products', component: AdminProducts, canActivate: [authGuard, roleGuard], data: { expectedRoles: ['ADMIN', 'CORPORATE'] } },
   { path: 'admin/orders', component: AdminOrders, canActivate: [authGuard, roleGuard], data: { expectedRoles: ['ADMIN', 'CORPORATE'] } },
+  { path: 'admin/users', component: AdminUsers, canActivate: [authGuard, roleGuard], data: { expectedRoles: ['ADMIN'] } },
+  { path: 'admin/stores', component: AdminStores, canActivate: [authGuard, roleGuard], data: { expectedRoles: ['ADMIN'] } },
   { path: '', redirectTo: '/login', pathMatch: 'full' },
   { path: '**', redirectTo: '/login' }
 ];
