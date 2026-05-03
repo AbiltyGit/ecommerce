@@ -28,6 +28,18 @@ public class OrderController {
         return ResponseEntity.ok(orderService.getOrdersByUserId(userId));
     }
 
+    @GetMapping("/corporate/{corporateUserId}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
+    public ResponseEntity<List<OrderResponse>> getOrdersByCorporateUserId(@PathVariable Long corporateUserId) {
+        return ResponseEntity.ok(orderService.getOrdersByCorporateUserId(corporateUserId));
+    }
+
+    @PatchMapping("/{id}/status")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
+    public ResponseEntity<OrderResponse> updateOrderStatus(@PathVariable Long id, @RequestParam String status) {
+        return ResponseEntity.ok(orderService.updateOrderStatus(id, status));
+    }
+
     @GetMapping
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
     public ResponseEntity<List<OrderResponse>> getAllOrders() {

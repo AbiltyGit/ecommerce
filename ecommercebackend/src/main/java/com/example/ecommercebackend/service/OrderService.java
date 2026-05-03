@@ -7,6 +7,8 @@ public interface OrderService {
     OrderResponse getOrderById(Long id);
     List<OrderResponse> getAllOrders();
     List<OrderResponse> getOrdersByUserId(Long userId);
+    List<OrderResponse> getOrdersByCorporateUserId(Long corporateUserId);
+    OrderResponse updateOrderStatus(Long id, String status);
     OrderResponse updateOrder(Long id, OrderRequest request);
     void deleteOrder(Long id);
 }

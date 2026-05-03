@@ -76,8 +76,22 @@ public class OrderServiceImpl implements OrderService {
         return orderRepository.findByUserId(userId).stream().map(this::mapToResponse).toList();
     }
 
+    @Override
+    public List<OrderResponse> getOrdersByCorporateUserId(Long corporateUserId) {
+        return orderRepository.findOrdersByCorporateUserId(corporateUserId).stream().map(this::mapToResponse).toList();
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse updateOrderStatus(Long id, String status) {
+        Order order = orderRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Order not found: " + id));
+        order.setStatus(com.example.ecommercebackend.model.enums.OrderStatus.valueOf(status));
+        Order saved = orderRepository.save(order);
+        return mapToResponse(saved);
+    }
+
     private OrderResponse mapToResponse(Order order) {
-        return new OrderResponse(order.getId(), order.getUser().getId(), order.getOrderDate(), order.getStatus(), order.getPaymentMethod());
+        return new OrderResponse(order.getId(), order.getUser().getId(), order.getUser().getUsername(), order.getOrderDate(), order.getStatus(), order.getPaymentMethod());
     }
 
     @Override
