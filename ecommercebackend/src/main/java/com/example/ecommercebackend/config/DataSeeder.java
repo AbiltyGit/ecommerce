@@ -20,7 +20,7 @@ public class DataSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        if (userRepository.count() == 0) {
+        if (userRepository.findByUsername("admin").isEmpty()) {
             User admin = new User();
             admin.setUsername("admin");
             admin.setPassword(passwordEncoder.encode("admin"));
@@ -28,6 +28,26 @@ public class DataSeeder implements CommandLineRunner {
             admin.setRole(UserRole.ADMIN);
             userRepository.save(admin);
             System.out.println("Mock Admin user created: admin / admin");
+        }
+
+        if (userRepository.findByUsername("corporate").isEmpty()) {
+            User corporate = new User();
+            corporate.setUsername("corporate");
+            corporate.setPassword(passwordEncoder.encode("corporate"));
+            corporate.setEmail("corporate@example.com");
+            corporate.setRole(UserRole.CORPORATE);
+            userRepository.save(corporate);
+            System.out.println("Mock Corporate user created: corporate / corporate");
+        }
+
+        if (userRepository.findByUsername("individual").isEmpty()) {
+            User individual = new User();
+            individual.setUsername("individual");
+            individual.setPassword(passwordEncoder.encode("individual"));
+            individual.setEmail("individual@example.com");
+            individual.setRole(UserRole.INDIVIDUAL);
+            userRepository.save(individual);
+            System.out.println("Mock Individual user created: individual / individual");
         }
     }
 }
