@@ -68,6 +68,7 @@ export class Shell implements OnInit {
           { label: 'Product Catalog',     route: '/admin/products',iconKey: 'products'  },
           { label: 'User Management',     route: '/admin/users',   iconKey: 'users'     },
           { label: 'Store Approval',      route: '/admin/stores',  iconKey: 'stores'    },
+          { label: 'System Audit Logs',   route: '/admin/audit',   iconKey: 'history'   },
         ];
         break;
       case 'CORPORATE':
