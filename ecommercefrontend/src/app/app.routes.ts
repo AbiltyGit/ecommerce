@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { Login } from './login/login';
 import { Chat } from './chat/chat';
+import { ProfileComponent } from './profile/profile';
 import { Dashboard } from './dashboard/dashboard';
 import { Products } from './products/products';
 import { CartComponent } from './cart/cart';
@@ -33,6 +34,7 @@ export const routes: Routes = [
       { path: 'cart', component: CartComponent },
       { path: 'checkout', component: Checkout },
       { path: 'order-history', component: OrderHistory },
+      { path: 'profile', component: ProfileComponent },
       { path: 'my-dashboard', component: IndividualDashboard },
       { path: 'chat', component: Chat },
 

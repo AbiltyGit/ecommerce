@@ -5,5 +5,7 @@ import java.util.List;
 public interface CustomerProfileService {
     CustomerProfileResponse createProfile(CustomerProfileRequest request);
     CustomerProfileResponse getProfileById(Long id);
+    CustomerProfileResponse getProfileByUserId(Long userId);
+    CustomerProfileResponse updateProfileByUserId(Long userId, CustomerProfileRequest request);
     List<CustomerProfileResponse> getAllProfiles();
 }

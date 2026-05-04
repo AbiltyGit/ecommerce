@@ -33,6 +33,39 @@ public class CustomerProfileServiceImpl implements CustomerProfileService {
         return mapToResponse(profileRepository.save(profile));
     }
     public CustomerProfileResponse getProfileById(Long id) { return mapToResponse(profileRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Profile not found"))); }
+    
+    public CustomerProfileResponse getProfileByUserId(Long userId) {
+        CustomerProfile profile = profileRepository.findByUserId(userId)
+            .orElseGet(() -> {
+                // If doesn't exist, create an empty profile
+                CustomerProfile newProfile = new CustomerProfile();
+                User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+                newProfile.setUser(user);
+                newProfile.setTotalSpend(BigDecimal.ZERO);
+                newProfile.setItemsPurchased(0);
+                newProfile.setAvgRating(0.0);
+                return profileRepository.save(newProfile);
+            });
+        return mapToResponse(profile);
+    }
+
+    public CustomerProfileResponse updateProfileByUserId(Long userId, CustomerProfileRequest request) {
+        CustomerProfile profile = profileRepository.findByUserId(userId)
+            .orElseGet(() -> {
+                CustomerProfile newProfile = new CustomerProfile();
+                User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+                newProfile.setUser(user);
+                return newProfile;
+            });
+        
+        if (request.gender() != null) profile.setGender(request.gender());
+        if (request.age() != null) profile.setAge(request.age());
+        if (request.city() != null) profile.setCity(request.city());
+        if (request.membershipType() != null) profile.setMembershipType(request.membershipType());
+        
+        return mapToResponse(profileRepository.save(profile));
+    }
+
     public List<CustomerProfileResponse> getAllProfiles() { return profileRepository.findAll().stream().map(this::mapToResponse).toList(); }
     private CustomerProfileResponse mapToResponse(CustomerProfile profile) { return new CustomerProfileResponse(profile.getId(), profile.getUser() != null ? profile.getUser().getId() : null, profile.getGender(), profile.getAge(), profile.getCity(), profile.getMembershipType(), profile.getTotalSpend(), profile.getItemsPurchased(), profile.getAvgRating(), profile.getDiscountApplied(), profile.getSatisfactionLevel()); }
 }

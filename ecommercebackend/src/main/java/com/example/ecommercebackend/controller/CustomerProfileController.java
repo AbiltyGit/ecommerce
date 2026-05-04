@@ -16,6 +16,17 @@ public class CustomerProfileController {
     public ResponseEntity<CustomerProfileResponse> createProfile(@RequestBody CustomerProfileRequest request) { return new ResponseEntity<>(profileService.createProfile(request), HttpStatus.CREATED); }
     @GetMapping("/{id}")
     public ResponseEntity<CustomerProfileResponse> getProfileById(@PathVariable Long id) { return ResponseEntity.ok(profileService.getProfileById(id)); }
+    
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<CustomerProfileResponse> getProfileByUserId(@PathVariable Long userId) {
+        return ResponseEntity.ok(profileService.getProfileByUserId(userId));
+    }
+
+    @PutMapping("/user/{userId}")
+    public ResponseEntity<CustomerProfileResponse> updateProfileByUserId(@PathVariable Long userId, @RequestBody CustomerProfileRequest request) {
+        return ResponseEntity.ok(profileService.updateProfileByUserId(userId, request));
+    }
+
     @GetMapping
     public ResponseEntity<List<CustomerProfileResponse>> getAllProfiles() { return ResponseEntity.ok(profileService.getAllProfiles()); }
 }
