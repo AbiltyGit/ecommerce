@@ -1,0 +1,102 @@
+<div class="flex flex-col h-full overflow-y-auto bg-slate-900/40">
+
+  <!-- Header -->
+  <header class="h-14 glass-panel border-b border-white/5 flex items-center justify-between px-6 shrink-0 sticky top-0 z-10">
+    <h1 class="text-base font-semibold text-white flex items-center gap-2">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+      Manage Products
+    </h1>
+    <button (click)="openAddModal()" class="bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+      Add Product
+    </button>
+  </header>
+
+  <!-- Content -->
+  <div class="p-6">
+    <div class="glass-card rounded-2xl border border-white/5 overflow-hidden animate-fade-in">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-white/5 border-b border-white/5">
+              <th class="p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">SKU</th>
+              <th class="p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Name</th>
+              <th class="p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Price</th>
+              <th class="p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Stock</th>
+              <th class="p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Store ID</th>
+              <th class="p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-white/5">
+            <tr *ngFor="let product of products" class="hover:bg-white/[0.02] transition-colors">
+              <td class="p-4 text-sm text-slate-400 font-mono">{{ product.sku }}</td>
+              <td class="p-4 text-sm font-medium text-white">{{ product.name }}</td>
+              <td class="p-4 text-sm text-indigo-400 font-bold">${{ product.price }}</td>
+              <td class="p-4 text-sm">
+                <span class="px-2 py-1 rounded text-xs font-medium border"
+                      [ngClass]="product.stockQuantity < 10 ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-green-500/10 text-green-400 border-green-500/20'">
+                  {{ product.stockQuantity }}
+                </span>
+              </td>
+              <td class="p-4 text-sm text-slate-400">{{ product.storeId || 'None' }}</td>
+              <td class="p-4 text-sm text-right">
+                <button (click)="deleteProduct(product.id)" class="text-red-400 hover:text-red-300 p-1.5 rounded-lg hover:bg-red-500/10 transition-colors">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
+              </td>
+            </tr>
+            <tr *ngIf="products.length === 0">
+              <td colspan="6" class="p-8 text-center text-slate-500">No products found.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Product Modal -->
+  <div *ngIf="showAddModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+    <div class="glass-card w-full max-w-md rounded-2xl p-6 border border-white/10 shadow-2xl">
+      <div class="flex items-center justify-between mb-6">
+        <h3 class="text-lg font-bold text-white">Add New Product</h3>
+        <button (click)="closeAddModal()" class="text-slate-400 hover:text-white transition-colors">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      
+      <form (ngSubmit)="onSubmit()" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">SKU</label>
+          <input type="text" [(ngModel)]="newProduct.sku" name="sku" required class="w-full glass-input px-3 py-2 rounded-xl text-white text-sm" placeholder="e.g. PRD-1234">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">Name</label>
+          <input type="text" [(ngModel)]="newProduct.name" name="name" required class="w-full glass-input px-3 py-2 rounded-xl text-white text-sm" placeholder="Product name">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">Description</label>
+          <textarea [(ngModel)]="newProduct.description" name="description" rows="2" class="w-full glass-input px-3 py-2 rounded-xl text-white text-sm resize-none"></textarea>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">Price ($)</label>
+            <input type="number" [(ngModel)]="newProduct.price" name="price" required class="w-full glass-input px-3 py-2 rounded-xl text-white text-sm">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">Initial Stock</label>
+            <input type="number" [(ngModel)]="newProduct.stockQuantity" name="stockQuantity" required class="w-full glass-input px-3 py-2 rounded-xl text-white text-sm">
+          </div>
+        </div>
+        <!-- Only Admin should freely pick Store ID, Corporate should automatically get their store ID -->
+        <div *ngIf="userRole === 'ADMIN'">
+          <label class="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">Store ID</label>
+          <input type="number" [(ngModel)]="newProduct.storeId" name="storeId" required class="w-full glass-input px-3 py-2 rounded-xl text-white text-sm" placeholder="Enter Store ID">
+        </div>
+        
+        <button type="submit" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 rounded-xl transition-colors mt-2 shadow-lg shadow-indigo-500/20">
+          Create Product
+        </button>
+      </form>
+    </div>
+  </div>
+</div>

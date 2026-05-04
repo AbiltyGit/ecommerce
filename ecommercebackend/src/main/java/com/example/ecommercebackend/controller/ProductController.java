@@ -29,6 +29,17 @@ public class ProductController {
         return ResponseEntity.ok(productService.getAllProducts());
     }
 
+    @GetMapping("/store/{storeId}")
+    public ResponseEntity<List<ProductResponse>> getProductsByStoreId(@PathVariable Long storeId) {
+        return ResponseEntity.ok(productService.getProductsByStoreId(storeId));
+    }
+
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
+    @GetMapping("/corporate/{corporateUserId}")
+    public ResponseEntity<List<ProductResponse>> getProductsByCorporateUserId(@PathVariable Long corporateUserId) {
+        return ResponseEntity.ok(productService.getProductsByCorporateUserId(corporateUserId));
+    }
+
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
     @PutMapping("/{id}")
     public ResponseEntity<ProductResponse> updateProduct(@PathVariable Long id, @RequestBody ProductRequest request) {

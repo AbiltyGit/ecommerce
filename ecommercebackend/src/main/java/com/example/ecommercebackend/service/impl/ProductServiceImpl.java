@@ -9,8 +9,10 @@ import com.example.ecommercebackend.repository.StoreRepository;
 import com.example.ecommercebackend.repository.CategoryRepository;
 import com.example.ecommercebackend.service.ProductService;
 import com.example.ecommercebackend.exception.ResourceNotFoundException;
+import com.example.ecommercebackend.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 import java.util.List;
+import java.util.ArrayList;
 @Service
 public class ProductServiceImpl implements ProductService {
     private final ProductRepository productRepository;
@@ -52,6 +54,21 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public List<ProductResponse> getAllProducts() {
         return productRepository.findAll().stream().map(this::mapToResponse).toList();
+    }
+
+    @Override
+    public List<ProductResponse> getProductsByStoreId(Long storeId) {
+        return productRepository.findByStoreId(storeId).stream().map(this::mapToResponse).toList();
+    }
+
+    @Override
+    public List<ProductResponse> getProductsByCorporateUserId(Long corporateUserId) {
+        List<Store> stores = storeRepository.findByCorporateUserId(corporateUserId);
+        List<ProductResponse> responses = new ArrayList<>();
+        for(Store store : stores) {
+            responses.addAll(productRepository.findByStoreId(store.getId()).stream().map(this::mapToResponse).toList());
+        }
+        return responses;
     }
     private ProductResponse mapToResponse(Product product) {
         Long storeId = product.getStore() != null ? product.getStore().getId() : null;

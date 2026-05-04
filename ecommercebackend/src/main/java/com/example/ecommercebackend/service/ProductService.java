@@ -6,6 +6,8 @@ public interface ProductService {
     ProductResponse createProduct(ProductRequest request);
     ProductResponse getProductById(Long id);
     List<ProductResponse> getAllProducts();
+    List<ProductResponse> getProductsByStoreId(Long storeId);
+    List<ProductResponse> getProductsByCorporateUserId(Long corporateUserId);
     ProductResponse updateProduct(Long id, ProductRequest request);
     void deleteProduct(Long id);
 }
