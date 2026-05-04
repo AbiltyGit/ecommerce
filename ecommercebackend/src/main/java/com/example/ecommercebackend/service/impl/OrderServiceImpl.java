@@ -112,7 +112,8 @@ public class OrderServiceImpl implements OrderService {
                 .map(i -> new OrderItemResponse(i.getId(), i.getProduct().getId(), i.getProduct().getName(), i.getQuantity(), i.getUnitPrice()))
                 .toList();
         }
-        return new OrderResponse(order.getId(), order.getUser().getId(), order.getUser().getUsername(), order.getOrderDate(), order.getStatus(), order.getPaymentMethod(), itemResponses);
+        String trackingNumber = order.getShipment() != null ? order.getShipment().getTrackingNumber() : null;
+        return new OrderResponse(order.getId(), order.getUser().getId(), order.getUser().getUsername(), order.getOrderDate(), order.getStatus(), order.getPaymentMethod(), trackingNumber, itemResponses);
     }
 
     @Override
