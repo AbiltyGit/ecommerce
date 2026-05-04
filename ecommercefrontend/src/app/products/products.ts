@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { RouterModule, Router } from '@angular/router';
@@ -29,7 +29,8 @@ export class Products implements OnInit {
   constructor(
     private http: HttpClient,
     private router: Router,
-    private authService: AuthService
+    private authService: AuthService,
+    private cdr: ChangeDetectorRef
   ) {}
   
   ngOnInit() {
@@ -48,8 +49,8 @@ export class Products implements OnInit {
 
   fetchCategories() {
     this.http.get<any[]>('/api/categories').subscribe({
-      next: (data) => this.categories = data,
-      error: (err) => console.error('Failed to load categories', err)
+      next: (data) => { this.categories = data; this.cdr.detectChanges(); },
+      error: (err) => { console.error('Failed to load categories', err); this.cdr.detectChanges(); }
     });
   }
 
@@ -67,8 +68,9 @@ export class Products implements OnInit {
         this.products = data.content;
         this.totalPages = data.totalPages;
         this.totalElements = data.totalElements;
+        this.cdr.detectChanges();
       },
-      error: (err) => console.error('Failed to load products', err)
+      error: (err) => { console.error('Failed to load products', err); this.cdr.detectChanges(); }
     });
   }
 
