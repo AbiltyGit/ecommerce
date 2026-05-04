@@ -2,6 +2,8 @@ package com.example.ecommercebackend.controller;
 import com.example.ecommercebackend.dto.request.OrderRequest;
 import com.example.ecommercebackend.dto.response.OrderResponse;
 import com.example.ecommercebackend.service.OrderService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -24,14 +26,14 @@ public class OrderController {
     }
 
     @GetMapping("/user/{userId}")
-    public ResponseEntity<List<OrderResponse>> getOrdersByUserId(@PathVariable Long userId) {
-        return ResponseEntity.ok(orderService.getOrdersByUserId(userId));
+    public ResponseEntity<Page<OrderResponse>> getOrdersByUserId(@PathVariable Long userId, Pageable pageable) {
+        return ResponseEntity.ok(orderService.getOrdersByUserId(userId, pageable));
     }
 
     @GetMapping("/corporate/{corporateUserId}")
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
-    public ResponseEntity<List<OrderResponse>> getOrdersByCorporateUserId(@PathVariable Long corporateUserId) {
-        return ResponseEntity.ok(orderService.getOrdersByCorporateUserId(corporateUserId));
+    public ResponseEntity<Page<OrderResponse>> getOrdersByCorporateUserId(@PathVariable Long corporateUserId, Pageable pageable) {
+        return ResponseEntity.ok(orderService.getOrdersByCorporateUserId(corporateUserId, pageable));
     }
 
     @PatchMapping("/{id}/status")
@@ -42,8 +44,8 @@ public class OrderController {
 
     @GetMapping
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
-    public ResponseEntity<List<OrderResponse>> getAllOrders() {
-        return ResponseEntity.ok(orderService.getAllOrders());
+    public ResponseEntity<Page<OrderResponse>> getAllOrders(Pageable pageable) {
+        return ResponseEntity.ok(orderService.getAllOrders(pageable));
     }
 
     @PutMapping("/{id}")

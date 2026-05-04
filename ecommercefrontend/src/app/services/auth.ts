@@ -39,4 +39,26 @@ export class AuthService {
   getToken(): string | null {
     return localStorage.getItem('token');
   }
+
+  getCurrentUser(): any | null {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        return JSON.parse(userStr);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  getUserId(): number {
+    const user = this.getCurrentUser();
+    return user ? user.id : 0;
+  }
+
+  getUserRole(): string {
+    const user = this.getCurrentUser();
+    return user ? user.role : '';
+  }
 }

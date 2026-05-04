@@ -14,6 +14,8 @@ import com.example.ecommercebackend.repository.ProductRepository;
 import com.example.ecommercebackend.service.OrderService;
 import com.example.ecommercebackend.exception.ResourceNotFoundException;
 import com.example.ecommercebackend.exception.BadRequestException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
@@ -78,20 +80,20 @@ public class OrderServiceImpl implements OrderService {
     }
     @Override
     @Transactional(readOnly = true)
-    public List<OrderResponse> getAllOrders() {
-        return orderRepository.findAll().stream().map(this::mapToResponse).toList();
+    public Page<OrderResponse> getAllOrders(Pageable pageable) {
+        return orderRepository.findAll(pageable).map(this::mapToResponse);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<OrderResponse> getOrdersByUserId(Long userId) {
-        return orderRepository.findByUserId(userId).stream().map(this::mapToResponse).toList();
+    public Page<OrderResponse> getOrdersByUserId(Long userId, Pageable pageable) {
+        return orderRepository.findByUserId(userId, pageable).map(this::mapToResponse);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<OrderResponse> getOrdersByCorporateUserId(Long corporateUserId) {
-        return orderRepository.findOrdersByCorporateUserId(corporateUserId).stream().map(this::mapToResponse).toList();
+    public Page<OrderResponse> getOrdersByCorporateUserId(Long corporateUserId, Pageable pageable) {
+        return orderRepository.findOrdersByCorporateUserId(corporateUserId, pageable).map(this::mapToResponse);
     }
 
     @Override
