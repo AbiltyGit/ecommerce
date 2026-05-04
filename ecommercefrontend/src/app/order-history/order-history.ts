@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
@@ -25,7 +25,8 @@ export class OrderHistory implements OnInit {
   constructor(
     private http: HttpClient,
     private router: Router,
-    private authService: AuthService
+    private authService: AuthService,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit() {
@@ -51,10 +52,12 @@ export class OrderHistory implements OnInit {
         // Sort orders by newest first
         this.orders = data.sort((a, b) => b.id - a.id);
         this.loading = false;
+        this.cdr.detectChanges();
       },
       error: (err) => {
         console.error('Failed to fetch orders', err);
         this.loading = false;
+        this.cdr.detectChanges();
       }
     });
   }
