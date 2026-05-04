@@ -13,7 +13,6 @@ import { AuthService } from '../services/auth';
 })
 export class Products implements OnInit {
   products: any[] = [];
-  filteredProducts: any[] = [];
   categories: any[] = [];
   
   searchQuery: string = '';
@@ -21,6 +20,11 @@ export class Products implements OnInit {
   sortBy: string = 'newest';
   
   userId: number = 0;
+  
+  currentPage: number = 0;
+  totalPages: number = 0;
+  pageSize: number = 12;
+  totalElements: number = 0;
 
   constructor(
     private http: HttpClient,
@@ -50,42 +54,46 @@ export class Products implements OnInit {
   }
 
   fetchProducts() {
-    this.http.get<any[]>('/api/products').subscribe({
+    let url = `/api/products?page=${this.currentPage}&size=${this.pageSize}&sortBy=${this.sortBy}`;
+    if (this.searchQuery.trim() !== '') {
+      url += `&search=${encodeURIComponent(this.searchQuery.trim())}`;
+    }
+    if (this.selectedCategoryId !== '') {
+      url += `&categoryId=${this.selectedCategoryId}`;
+    }
+
+    this.http.get<any>(url).subscribe({
       next: (data) => {
-        this.products = data;
-        this.applyFilters();
+        this.products = data.content;
+        this.totalPages = data.totalPages;
+        this.totalElements = data.totalElements;
       },
       error: (err) => console.error('Failed to load products', err)
     });
   }
 
   applyFilters() {
-    let result = [...this.products];
+    this.currentPage = 0;
+    this.fetchProducts();
+  }
 
-    // Filter by Category
-    if (this.selectedCategoryId !== '') {
-      result = result.filter(p => p.category && p.category.id == this.selectedCategoryId);
+  getCategoryName(categoryId: number): string {
+    const category = this.categories.find(c => c.id === categoryId);
+    return category ? category.name : 'Uncategorized';
+  }
+
+  nextPage() {
+    if (this.currentPage < this.totalPages - 1) {
+      this.currentPage++;
+      this.fetchProducts();
     }
+  }
 
-    // Filter by Search Query
-    if (this.searchQuery.trim() !== '') {
-      const q = this.searchQuery.toLowerCase();
-      result = result.filter(p => 
-        p.name.toLowerCase().includes(q) || 
-        p.description.toLowerCase().includes(q)
-      );
+  prevPage() {
+    if (this.currentPage > 0) {
+      this.currentPage--;
+      this.fetchProducts();
     }
-
-    // Sort
-    if (this.sortBy === 'price_asc') {
-      result.sort((a, b) => a.price - b.price);
-    } else if (this.sortBy === 'price_desc') {
-      result.sort((a, b) => b.price - a.price);
-    } else if (this.sortBy === 'newest') {
-      result.sort((a, b) => b.id - a.id); // Assuming higher ID is newer
-    }
-
-    this.filteredProducts = result;
   }
 
   addToCart(productId: number) {

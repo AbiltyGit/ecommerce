@@ -39,9 +39,13 @@ public class OrderServiceImpl implements OrderService {
         Order order = new Order();
         order.setUser(user);
         order.setPaymentMethod(request.paymentMethod());
+        order.setShippingAddress(request.shippingAddress()); // Adres eklendi
+        order.setBillingAddress(request.billingAddress());   // Adres eklendi
         order.setStatus(OrderStatus.PENDING);
         
+        java.math.BigDecimal totalAmount = java.math.BigDecimal.ZERO;
         List<OrderItem> items = new ArrayList<>();
+        
         for(OrderItemRequest itemReq : request.items()) {
             Product product = productRepository.findById(itemReq.productId()).orElseThrow(() -> new ResourceNotFoundException("Product not found"));
             if(product.getStockQuantity() < itemReq.quantity()) {
@@ -57,7 +61,11 @@ public class OrderServiceImpl implements OrderService {
             item.setQuantity(itemReq.quantity());
             item.setUnitPrice(product.getPrice());
             items.add(item);
+            
+            // Fiyat hesaplaması
+            totalAmount = totalAmount.add(product.getPrice().multiply(java.math.BigDecimal.valueOf(itemReq.quantity())));
         }
+        order.setTotalAmount(totalAmount);
         order.setItems(items);
         Order saved = orderRepository.save(order);
         return mapToResponse(saved);

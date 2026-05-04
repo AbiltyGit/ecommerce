@@ -17,7 +17,7 @@ public class CartItem {
     @JsonIgnore
     private Cart cart;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "product_id", nullable = false)
     @JsonIgnoreProperties({"store", "category", "reviews"})
     private Product product;

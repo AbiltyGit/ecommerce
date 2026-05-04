@@ -1,4 +1,4 @@
---- BACKEND CONTEXT GENERATED ON Paz 26 Nis 2026 22:27:13 +03 ---
+--- BACKEND CONTEXT GENERATED ON Pzt 04 May 2026 05:09:03 +03 ---
 
 
 --- FILE: ./src/main/java/com/example/ecommercebackend/EcommercebackendApplication.java ---
@@ -255,6 +255,15 @@ public class Order {
     @OneToOne(mappedBy = "order", cascade = CascadeType.ALL)
     private Shipment shipment;
 
+    @Column(name = "total_amount")
+    private java.math.BigDecimal totalAmount;
+
+    @Column(name = "shipping_address")
+    private String shippingAddress;
+
+    @Column(name = "billing_address")
+    private String billingAddress;
+
     // Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -276,6 +285,15 @@ public class Order {
     
     public Shipment getShipment() { return shipment; }
     public void setShipment(Shipment shipment) { this.shipment = shipment; }
+
+    public java.math.BigDecimal getTotalAmount() { return totalAmount; }
+    public void setTotalAmount(java.math.BigDecimal totalAmount) { this.totalAmount = totalAmount; }
+
+    public String getShippingAddress() { return shippingAddress; }
+    public void setShippingAddress(String shippingAddress) { this.shippingAddress = shippingAddress; }
+
+    public String getBillingAddress() { return billingAddress; }
+    public void setBillingAddress(String billingAddress) { this.billingAddress = billingAddress; }
 }
 
 
@@ -512,6 +530,135 @@ public class RefreshToken {
 }
 
 
+--- FILE: ./src/main/java/com/example/ecommercebackend/model/Cart.java ---
+package com.example.ecommercebackend.model;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import jakarta.persistence.*;
+import java.util.ArrayList;
+import java.util.List;
+
+@Entity
+@Table(name = "carts")
+public class Cart {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    @JsonIgnore
+    private User user;
+
+    @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @JsonIgnoreProperties("cart")
+    private List<CartItem> items = new ArrayList<>();
+
+    public Cart() {}
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
+
+    public List<CartItem> getItems() { return items; }
+    public void setItems(List<CartItem> items) { this.items = items; }
+}
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/model/CartItem.java ---
+package com.example.ecommercebackend.model;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "cart_items")
+public class CartItem {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cart_id", nullable = false)
+    @JsonIgnore
+    private Cart cart;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "product_id", nullable = false)
+    @JsonIgnoreProperties({"store", "category", "reviews"})
+    private Product product;
+
+    @Column(nullable = false)
+    private Integer quantity;
+
+    public CartItem() {}
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
+    public Cart getCart() { return cart; }
+    public void setCart(Cart cart) { this.cart = cart; }
+
+    public Product getProduct() { return product; }
+    public void setProduct(Product product) { this.product = product; }
+
+    public Integer getQuantity() { return quantity; }
+    public void setQuantity(Integer quantity) { this.quantity = quantity; }
+}
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/model/AuditLog.java ---
+package com.example.ecommercebackend.model;
+
+import jakarta.persistence.*;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "audit_logs")
+public class AuditLog {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String action;
+    
+    private String username;
+    
+    @Column(length = 1000)
+    private String details;
+    
+    private LocalDateTime timestamp = LocalDateTime.now();
+
+    public AuditLog() {}
+
+    public AuditLog(String action, String username, String details) {
+        this.action = action;
+        this.username = username;
+        this.details = details;
+    }
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
+    public String getAction() { return action; }
+    public void setAction(String action) { this.action = action; }
+
+    public String getUsername() { return username; }
+    public void setUsername(String username) { this.username = username; }
+
+    public String getDetails() { return details; }
+    public void setDetails(String details) { this.details = details; }
+
+    public LocalDateTime getTimestamp() { return timestamp; }
+    public void setTimestamp(LocalDateTime timestamp) { this.timestamp = timestamp; }
+}
+
+
 --- FILE: ./src/main/java/com/example/ecommercebackend/repository/UserRepository.java ---
 package com.example.ecommercebackend.repository;
 
@@ -532,7 +679,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
 package com.example.ecommercebackend.repository;
 
 import com.example.ecommercebackend.model.Product;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -541,6 +692,11 @@ import java.util.List;
 public interface ProductRepository extends JpaRepository<Product, Long> {
     List<Product> findByStoreId(Long storeId);
     List<Product> findByCategoryId(Long categoryId);
+
+    @Query("SELECT p FROM Product p WHERE " +
+           "(:categoryId = -1L OR p.category.id = :categoryId) AND " +
+           "(:search = '' OR LOWER(p.name) LIKE LOWER(:search) OR LOWER(p.description) LIKE LOWER(:search))")
+    Page<Product> findWithFilters(@Param("categoryId") Long categoryId, @Param("search") String search, Pageable pageable);
 }
 
 
@@ -549,6 +705,8 @@ package com.example.ecommercebackend.repository;
 
 import com.example.ecommercebackend.model.Order;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -556,6 +714,9 @@ import java.util.List;
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Order> findByUserId(Long userId);
+
+    @Query("SELECT DISTINCT o FROM Order o JOIN o.items i JOIN i.product p JOIN p.store s WHERE s.corporateUser.id = :corporateUserId")
+    List<Order> findOrdersByCorporateUserId(@Param("corporateUserId") Long corporateUserId);
 }
 
 
@@ -662,6 +823,45 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
 }
 
 
+--- FILE: ./src/main/java/com/example/ecommercebackend/repository/CartRepository.java ---
+package com.example.ecommercebackend.repository;
+
+import com.example.ecommercebackend.model.Cart;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+import java.util.Optional;
+
+@Repository
+public interface CartRepository extends JpaRepository<Cart, Long> {
+    // Eager loading ile tek seferde sepeti, kullanıcıyı, ürünleri ve öğeleri çekiyoruz.
+    @EntityGraph(attributePaths = {"user", "items", "items.product"})
+    Optional<Cart> findByUserId(Long userId);
+}
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/repository/CartItemRepository.java ---
+package com.example.ecommercebackend.repository;
+import com.example.ecommercebackend.model.CartItem;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface CartItemRepository extends JpaRepository<CartItem, Long> {
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/repository/AuditLogRepository.java ---
+package com.example.ecommercebackend.repository;
+
+import com.example.ecommercebackend.model.AuditLog;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
+}
+
+
 --- FILE: ./src/main/java/com/example/ecommercebackend/service/UserService.java ---
 package com.example.ecommercebackend.service;
 import com.example.ecommercebackend.dto.request.UserRequest;
@@ -671,6 +871,7 @@ public interface UserService {
     UserResponse createUser(UserRequest request);
     UserResponse getUserById(Long id);
     List<UserResponse> getAllUsers();
+    void deleteUser(Long id);
 }
 
 
@@ -708,6 +909,11 @@ public class UserServiceImpl implements UserService {
     public List<UserResponse> getAllUsers() {
         return userRepository.findAll().stream().map(this::mapToResponse).toList();
     }
+    @Override
+    public void deleteUser(Long id) {
+        User user = userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User not found: " + id));
+        userRepository.delete(user);
+    }
     private UserResponse mapToResponse(User user) {
         return new UserResponse(user.getId(), user.getUsername(), user.getEmail(), user.getRole(), user.getCreatedAt());
     }
@@ -725,9 +931,17 @@ import com.example.ecommercebackend.repository.ProductRepository;
 import com.example.ecommercebackend.repository.StoreRepository;
 import com.example.ecommercebackend.repository.CategoryRepository;
 import com.example.ecommercebackend.service.ProductService;
+import com.example.ecommercebackend.exception.BadRequestException;
+import com.example.ecommercebackend.exception.ResourceNotFoundException;
 import com.example.ecommercebackend.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 import java.util.List;
+import java.util.ArrayList;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.Authentication;
+import com.example.ecommercebackend.security.CustomUserDetails;
+import com.example.ecommercebackend.model.enums.UserRole;
+
 @Service
 public class ProductServiceImpl implements ProductService {
     private final ProductRepository productRepository;
@@ -740,7 +954,7 @@ public class ProductServiceImpl implements ProductService {
         this.categoryRepository = categoryRepository;
     }
 
-    @Override
+@Override
     public ProductResponse createProduct(ProductRequest request) {
         Product product = new Product();
         product.setSku(request.sku());
@@ -749,10 +963,23 @@ public class ProductServiceImpl implements ProductService {
         product.setPrice(request.price());
         product.setStockQuantity(request.stockQuantity());
         
-        if (request.storeId() != null) {
+        // Security Context üzerinden aktif kullanıcıyı al
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        CustomUserDetails userDetails = (CustomUserDetails) auth.getPrincipal();
+        
+        if (userDetails.getUser().getRole() == UserRole.CORPORATE) {
+            // Corporate ise storeId'yi zorla kendi mağazasına ayarla
+            List<Store> corporateStores = storeRepository.findByCorporateUserId(userDetails.getUser().getId());
+            if (corporateStores.isEmpty()) {
+                throw new BadRequestException("Corporate user does not have an active store.");
+            }
+            product.setStore(corporateStores.get(0));
+        } else if (request.storeId() != null) {
+            // Admin ise istediği store'a ekleyebilir
             Store store = storeRepository.findById(request.storeId()).orElseThrow(() -> new ResourceNotFoundException("Store not found"));
             product.setStore(store);
         }
+
         if (request.categoryId() != null) {
             Category category = categoryRepository.findById(request.categoryId()).orElseThrow(() -> new ResourceNotFoundException("Category not found"));
             product.setCategory(category);
@@ -770,10 +997,65 @@ public class ProductServiceImpl implements ProductService {
     public List<ProductResponse> getAllProducts() {
         return productRepository.findAll().stream().map(this::mapToResponse).toList();
     }
+
+    @Override
+    public org.springframework.data.domain.Page<ProductResponse> getProducts(int page, int size, String search, Long categoryId, String sortBy) {
+        org.springframework.data.domain.Sort sort = org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "id"); // newest
+        if ("price_asc".equals(sortBy)) {
+            sort = org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.ASC, "price");
+        } else if ("price_desc".equals(sortBy)) {
+            sort = org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "price");
+        }
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size, sort);
+        String searchQuery = (search != null && !search.trim().isEmpty()) ? "%" + search.trim() + "%" : "";
+        Long catId = (categoryId != null) ? categoryId : -1L;
+        return productRepository.findWithFilters(catId, searchQuery, pageable).map(this::mapToResponse);
+    }
+
+    @Override
+    public List<ProductResponse> getProductsByStoreId(Long storeId) {
+        return productRepository.findByStoreId(storeId).stream().map(this::mapToResponse).toList();
+    }
+
+    @Override
+    public List<ProductResponse> getProductsByCorporateUserId(Long corporateUserId) {
+        List<Store> stores = storeRepository.findByCorporateUserId(corporateUserId);
+        List<ProductResponse> responses = new ArrayList<>();
+        for(Store store : stores) {
+            responses.addAll(productRepository.findByStoreId(store.getId()).stream().map(this::mapToResponse).toList());
+        }
+        return responses;
+    }
     private ProductResponse mapToResponse(Product product) {
         Long storeId = product.getStore() != null ? product.getStore().getId() : null;
         Long catId = product.getCategory() != null ? product.getCategory().getId() : null;
         return new ProductResponse(product.getId(), product.getSku(), product.getName(), product.getDescription(), product.getPrice(), product.getStockQuantity(), storeId, catId);
+    }
+
+    @Override
+    public ProductResponse updateProduct(Long id, ProductRequest request) {
+        Product product = productRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Product not found: " + id));
+        product.setSku(request.sku());
+        product.setName(request.name());
+        product.setDescription(request.description());
+        product.setPrice(request.price());
+        product.setStockQuantity(request.stockQuantity());
+        if (request.storeId() != null) {
+            Store store = storeRepository.findById(request.storeId()).orElseThrow(() -> new ResourceNotFoundException("Store not found"));
+            product.setStore(store);
+        }
+        if (request.categoryId() != null) {
+            Category category = categoryRepository.findById(request.categoryId()).orElseThrow(() -> new ResourceNotFoundException("Category not found"));
+            product.setCategory(category);
+        }
+        Product saved = productRepository.save(product);
+        return mapToResponse(saved);
+    }
+    
+    @Override
+    public void deleteProduct(Long id) {
+        Product product = productRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Product not found: " + id));
+        productRepository.delete(product);
     }
 }
 
@@ -782,6 +1064,7 @@ public class ProductServiceImpl implements ProductService {
 package com.example.ecommercebackend.service.impl;
 import com.example.ecommercebackend.dto.request.OrderRequest;
 import com.example.ecommercebackend.dto.request.OrderItemRequest;
+import com.example.ecommercebackend.dto.response.OrderItemResponse;
 import com.example.ecommercebackend.dto.response.OrderResponse;
 import com.example.ecommercebackend.model.Order;
 import com.example.ecommercebackend.model.OrderItem;
@@ -819,9 +1102,13 @@ public class OrderServiceImpl implements OrderService {
         Order order = new Order();
         order.setUser(user);
         order.setPaymentMethod(request.paymentMethod());
+        order.setShippingAddress(request.shippingAddress()); // Adres eklendi
+        order.setBillingAddress(request.billingAddress());   // Adres eklendi
         order.setStatus(OrderStatus.PENDING);
         
+        java.math.BigDecimal totalAmount = java.math.BigDecimal.ZERO;
         List<OrderItem> items = new ArrayList<>();
+        
         for(OrderItemRequest itemReq : request.items()) {
             Product product = productRepository.findById(itemReq.productId()).orElseThrow(() -> new ResourceNotFoundException("Product not found"));
             if(product.getStockQuantity() < itemReq.quantity()) {
@@ -837,22 +1124,72 @@ public class OrderServiceImpl implements OrderService {
             item.setQuantity(itemReq.quantity());
             item.setUnitPrice(product.getPrice());
             items.add(item);
+            
+            // Fiyat hesaplaması
+            totalAmount = totalAmount.add(product.getPrice().multiply(java.math.BigDecimal.valueOf(itemReq.quantity())));
         }
+        order.setTotalAmount(totalAmount);
         order.setItems(items);
         Order saved = orderRepository.save(order);
         return mapToResponse(saved);
     }
     @Override
+    @Transactional(readOnly = true)
     public OrderResponse getOrderById(Long id) {
         Order order = orderRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Order not found"));
         return mapToResponse(order);
     }
     @Override
+    @Transactional(readOnly = true)
     public List<OrderResponse> getAllOrders() {
         return orderRepository.findAll().stream().map(this::mapToResponse).toList();
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<OrderResponse> getOrdersByUserId(Long userId) {
+        return orderRepository.findByUserId(userId).stream().map(this::mapToResponse).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<OrderResponse> getOrdersByCorporateUserId(Long corporateUserId) {
+        return orderRepository.findOrdersByCorporateUserId(corporateUserId).stream().map(this::mapToResponse).toList();
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse updateOrderStatus(Long id, String status) {
+        Order order = orderRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Order not found: " + id));
+        order.setStatus(com.example.ecommercebackend.model.enums.OrderStatus.valueOf(status));
+        Order saved = orderRepository.save(order);
+        return mapToResponse(saved);
+    }
+
     private OrderResponse mapToResponse(Order order) {
-        return new OrderResponse(order.getId(), order.getUser().getId(), order.getOrderDate(), order.getStatus(), order.getPaymentMethod());
+        List<OrderItemResponse> itemResponses = new ArrayList<>();
+        if (order.getItems() != null) {
+            itemResponses = order.getItems().stream()
+                .map(i -> new OrderItemResponse(i.getId(), i.getProduct().getId(), i.getProduct().getName(), i.getQuantity(), i.getUnitPrice()))
+                .toList();
+        }
+        return new OrderResponse(order.getId(), order.getUser().getId(), order.getUser().getUsername(), order.getOrderDate(), order.getStatus(), order.getPaymentMethod(), itemResponses);
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse updateOrder(Long id, OrderRequest request) {
+        Order order = orderRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Order not found: " + id));
+        order.setPaymentMethod(request.paymentMethod());
+        Order saved = orderRepository.save(order);
+        return mapToResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public void deleteOrder(Long id) {
+        Order order = orderRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Order not found: " + id));
+        orderRepository.delete(order);
     }
 }
 
@@ -887,6 +1224,11 @@ public class StoreServiceImpl implements StoreService {
     }
     public StoreResponse getStoreById(Long id) { return mapToResponse(storeRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Store not found"))); }
     public List<StoreResponse> getAllStores() { return storeRepository.findAll().stream().map(this::mapToResponse).toList(); }
+    public StoreResponse toggleStoreStatus(Long id) {
+        Store store = storeRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Store not found: " + id));
+        store.setOpen(!store.isOpen());
+        return mapToResponse(storeRepository.save(store));
+    }
     private StoreResponse mapToResponse(Store store) { return new StoreResponse(store.getId(), store.getName(), store.getDescription(), store.isOpen(), store.getCorporateUser() != null ? store.getCorporateUser().getId() : null); }
 }
 
@@ -1176,10 +1518,13 @@ public class ChatServiceImpl implements ChatService {
         askPayload.put("role", role);
         askPayload.put("chat_history", request.getChatHistory());
 
+        System.out.println("DEBUG (Java): Sending to /ask...");
         Map<String, Object> askResponse;
         try {
             askResponse = restTemplate.postForObject(chatbotBaseUrl + "/ask", askPayload, Map.class);
+            System.out.println("DEBUG (Java): Received from /ask: " + (askResponse != null ? askResponse.keySet() : "null"));
         } catch (Exception e) {
+            System.out.println("DEBUG (Java): Error in /ask: " + e.getMessage());
             return createFallbackResponse("Failed to connect to Python AI Ask Endpoint (/ask): " + e.getMessage());
         }
 
@@ -1189,6 +1534,7 @@ public class ChatServiceImpl implements ChatService {
         String answer = (String) askResponse.get("answer");
         
         if (sqlQuery == null || sqlQuery.trim().isEmpty()) {
+            System.out.println("DEBUG (Java): No SQL generated, returning fallback.");
             return createFallbackResponse(answer);
         }
 
@@ -1196,22 +1542,27 @@ public class ChatServiceImpl implements ChatService {
 
         // 2. Execute SQL with Retry via Error Agent
         try {
+            System.out.println("DEBUG (Java): Executing SQL: " + sqlQuery);
             data = queryExecutionService.executeReadOnlyQuery(sqlQuery);
+            System.out.println("DEBUG (Java): Data fetched, row count: " + data.size());
         } catch (Exception e) {
+            System.out.println("DEBUG (Java): SQL Failed: " + e.getMessage());
             Map<String, Object> fixPayload = new HashMap<>();
             fixPayload.put("bad_sql", sqlQuery);
             fixPayload.put("error", e.getMessage());
 
             try {
+                System.out.println("DEBUG (Java): Sending to /fix_sql...");
                 Map<String, Object> fixResponse = restTemplate.postForObject(chatbotBaseUrl + "/fix_sql", fixPayload, Map.class);
                 if (fixResponse != null && fixResponse.get("sql_query") != null) {
                     sqlQuery = (String) fixResponse.get("sql_query");
-                    // 2nd Try
+                    System.out.println("DEBUG (Java): Fixed SQL: " + sqlQuery);
                     data = queryExecutionService.executeReadOnlyQuery(sqlQuery);
                 } else {
                     return createFallbackResponse("Database execution failed and AI Error Agent was unable to fix the SQL syntax.");
                 }
             } catch (Exception ex) {
+                System.out.println("DEBUG (Java): /fix_sql failed: " + ex.getMessage());
                 return createFallbackResponse("Database execution failed again after AI retry attempt: " + ex.getMessage());
             }
         }
@@ -1224,15 +1575,19 @@ public class ChatServiceImpl implements ChatService {
         String visualizationCode = null;
 
         try {
+            System.out.println("DEBUG (Java): Sending to /analyze...");
             Map<String, Object> analyzeResponse = restTemplate.postForObject(chatbotBaseUrl + "/analyze", analyzePayload, Map.class);
+            System.out.println("DEBUG (Java): Received from /analyze: " + (analyzeResponse != null ? analyzeResponse.keySet() : "null"));
             if (analyzeResponse != null) {
                 answer = (String) analyzeResponse.get("answer");
                 visualizationCode = (String) analyzeResponse.get("visualization_code");
             }
         } catch (Exception e) {
+            System.out.println("DEBUG (Java): Error in /analyze: " + e.getMessage());
             answer = "Data retrieved successfully, but Python Analysis Endpoint (/analyze) failed: " + e.getMessage();
         }
 
+        System.out.println("DEBUG (Java): Returning Final Response to Frontend.");
         ChatResponse finalResponse = new ChatResponse(answer, data);
         finalResponse.setVisualizationCode(visualizationCode);
         return finalResponse;
@@ -1244,15 +1599,135 @@ public class ChatServiceImpl implements ChatService {
 }
 
 
+--- FILE: ./src/main/java/com/example/ecommercebackend/service/impl/CartServiceImpl.java ---
+package com.example.ecommercebackend.service.impl;
+
+import com.example.ecommercebackend.model.Cart;
+import com.example.ecommercebackend.model.CartItem;
+import com.example.ecommercebackend.model.Product;
+import com.example.ecommercebackend.model.User;
+import com.example.ecommercebackend.repository.CartRepository;
+import com.example.ecommercebackend.repository.CartItemRepository;
+import com.example.ecommercebackend.repository.ProductRepository;
+import com.example.ecommercebackend.repository.UserRepository;
+import com.example.ecommercebackend.service.CartService;
+import com.example.ecommercebackend.dto.response.CartItemResponse;
+import com.example.ecommercebackend.dto.response.CartResponse;
+import com.example.ecommercebackend.exception.ResourceNotFoundException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class CartServiceImpl implements CartService {
+    private final CartRepository cartRepository;
+    private final CartItemRepository cartItemRepository;
+    private final ProductRepository productRepository;
+    private final UserRepository userRepository;
+
+    public CartServiceImpl(CartRepository cartRepository, CartItemRepository cartItemRepository, ProductRepository productRepository, UserRepository userRepository) {
+        this.cartRepository = cartRepository;
+        this.cartItemRepository = cartItemRepository;
+        this.productRepository = productRepository;
+        this.userRepository = userRepository;
+    }
+
+    private CartResponse mapToResponse(Cart cart) {
+        if (cart == null) return null;
+        return new CartResponse(
+            cart.getId(),
+            cart.getUser() != null ? cart.getUser().getId() : null,
+            cart.getItems().stream().map(item -> new CartItemResponse(
+                item.getId(),
+                new CartItemResponse.ProductDto(
+                    item.getProduct().getId(),
+                    item.getProduct().getName(),
+                    item.getProduct().getPrice()
+                ),
+                item.getQuantity()
+            )).collect(java.util.stream.Collectors.toList())
+        );
+    }
+
+    @Override
+    @Transactional
+    public CartResponse getCartByUserId(Long userId) {
+        Cart cart = cartRepository.findByUserId(userId).orElseGet(() -> {
+            User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+            Cart newCart = new Cart();
+            newCart.setUser(user);
+            return cartRepository.save(newCart);
+        });
+        return mapToResponse(cart);
+    }
+
+    @Override
+    @Transactional
+    public CartResponse addToCart(Long userId, Long productId, Integer quantity) {
+        Cart cart = cartRepository.findByUserId(userId).orElseGet(() -> {
+            User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+            Cart newCart = new Cart();
+            newCart.setUser(user);
+            return cartRepository.save(newCart);
+        });
+        
+        Product product = productRepository.findById(productId).orElseThrow(() -> new ResourceNotFoundException("Product not found"));
+        
+        CartItem existingItem = cart.getItems().stream()
+                .filter(item -> item.getProduct().getId().equals(productId))
+                .findFirst()
+                .orElse(null);
+
+        if (existingItem != null) {
+            existingItem.setQuantity(existingItem.getQuantity() + quantity);
+        } else {
+            CartItem newItem = new CartItem();
+            newItem.setCart(cart);
+            newItem.setProduct(product);
+            newItem.setQuantity(quantity);
+            cart.getItems().add(newItem);
+        }
+        cartRepository.save(cart);
+        return mapToResponse(cart);
+    }
+
+@Override
+    @Transactional
+    public CartResponse removeFromCart(Long userId, Long cartItemId) {
+        Cart cart = cartRepository.findByUserId(userId).orElseThrow(() -> new ResourceNotFoundException("Cart not found"));
+        cart.getItems().removeIf(item -> item.getId().equals(cartItemId));
+        cartRepository.save(cart);
+        return mapToResponse(cart);
+    }
+
+@Override
+    @Transactional
+    public void clearCart(Long userId) {
+        Cart cart = cartRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Cart not found"));
+        
+        cart.getItems().clear();
+        cartRepository.save(cart);
+    }
+}
+
 --- FILE: ./src/main/java/com/example/ecommercebackend/service/ProductService.java ---
 package com.example.ecommercebackend.service;
+
 import com.example.ecommercebackend.dto.request.ProductRequest;
 import com.example.ecommercebackend.dto.response.ProductResponse;
+import org.springframework.data.domain.Page;
+
 import java.util.List;
+
 public interface ProductService {
     ProductResponse createProduct(ProductRequest request);
     ProductResponse getProductById(Long id);
     List<ProductResponse> getAllProducts();
+    Page<ProductResponse> getProducts(int page, int size, String search, Long categoryId, String sortBy);
+    List<ProductResponse> getProductsByStoreId(Long storeId);
+    List<ProductResponse> getProductsByCorporateUserId(Long corporateUserId);
+    ProductResponse updateProduct(Long id, ProductRequest request);
+    void deleteProduct(Long id);
 }
 
 
@@ -1265,6 +1740,11 @@ public interface OrderService {
     OrderResponse createOrder(OrderRequest request);
     OrderResponse getOrderById(Long id);
     List<OrderResponse> getAllOrders();
+    List<OrderResponse> getOrdersByUserId(Long userId);
+    List<OrderResponse> getOrdersByCorporateUserId(Long corporateUserId);
+    OrderResponse updateOrderStatus(Long id, String status);
+    OrderResponse updateOrder(Long id, OrderRequest request);
+    void deleteOrder(Long id);
 }
 
 
@@ -1277,6 +1757,7 @@ public interface StoreService {
     StoreResponse createStore(StoreRequest request);
     StoreResponse getStoreById(Long id);
     List<StoreResponse> getAllStores();
+    StoreResponse toggleStoreStatus(Long id);
 }
 
 
@@ -1350,7 +1831,12 @@ public class RefreshTokenService {
         this.refreshTokenRepository = refreshTokenRepository; this.userRepository = userRepository;
     }
     public Optional<RefreshToken> findByToken(String token) { return refreshTokenRepository.findByToken(token); }
+    @Transactional
     public RefreshToken createRefreshToken(Long userId) {
+        // Delete any existing token for this user to avoid unique constraint violations
+        refreshTokenRepository.deleteByUserId(userId);
+        refreshTokenRepository.flush();
+
         RefreshToken refreshToken = new RefreshToken();
         refreshToken.setUser(userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found")));
         refreshToken.setExpiryDate(Instant.now().plusMillis(refreshTokenDurationMs));
@@ -1391,6 +1877,18 @@ public interface ChatService {
 }
 
 
+--- FILE: ./src/main/java/com/example/ecommercebackend/service/CartService.java ---
+package com.example.ecommercebackend.service;
+
+import com.example.ecommercebackend.dto.response.CartResponse;
+
+public interface CartService {
+    CartResponse getCartByUserId(Long userId);
+    CartResponse addToCart(Long userId, Long productId, Integer quantity);
+    CartResponse removeFromCart(Long userId, Long cartItemId);
+    void clearCart(Long userId);
+}
+
 --- FILE: ./src/main/java/com/example/ecommercebackend/controller/ProductController.java ---
 package com.example.ecommercebackend.controller;
 import com.example.ecommercebackend.dto.request.ProductRequest;
@@ -1419,8 +1917,37 @@ public class ProductController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ProductResponse>> getAllProducts() {
-        return ResponseEntity.ok(productService.getAllProducts());
+    public ResponseEntity<org.springframework.data.domain.Page<ProductResponse>> getAllProducts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(defaultValue = "newest") String sortBy) {
+        return ResponseEntity.ok(productService.getProducts(page, size, search, categoryId, sortBy));
+    }
+
+    @GetMapping("/store/{storeId}")
+    public ResponseEntity<List<ProductResponse>> getProductsByStoreId(@PathVariable Long storeId) {
+        return ResponseEntity.ok(productService.getProductsByStoreId(storeId));
+    }
+
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
+    @GetMapping("/corporate/{corporateUserId}")
+    public ResponseEntity<List<ProductResponse>> getProductsByCorporateUserId(@PathVariable Long corporateUserId) {
+        return ResponseEntity.ok(productService.getProductsByCorporateUserId(corporateUserId));
+    }
+
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
+    @PutMapping("/{id}")
+    public ResponseEntity<ProductResponse> updateProduct(@PathVariable Long id, @RequestBody ProductRequest request) {
+        return ResponseEntity.ok(productService.updateProduct(id, request));
+    }
+
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteProduct(@PathVariable Long id) {
+        productService.deleteProduct(id);
+        return ResponseEntity.ok().build();
     }
 }
 
@@ -1437,6 +1964,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/users")
+@org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
 public class UserController {
     private final UserService userService;
     public UserController(UserService userService) { this.userService = userService; }
@@ -1454,6 +1982,12 @@ public class UserController {
     @GetMapping
     public ResponseEntity<List<UserResponse>> getAllUsers() {
         return ResponseEntity.ok(userService.getAllUsers());
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
+        userService.deleteUser(id);
+        return ResponseEntity.noContent().build();
     }
 }
 
@@ -1484,9 +2018,38 @@ public class OrderController {
         return ResponseEntity.ok(orderService.getOrderById(id));
     }
 
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<List<OrderResponse>> getOrdersByUserId(@PathVariable Long userId) {
+        return ResponseEntity.ok(orderService.getOrdersByUserId(userId));
+    }
+
+    @GetMapping("/corporate/{corporateUserId}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
+    public ResponseEntity<List<OrderResponse>> getOrdersByCorporateUserId(@PathVariable Long corporateUserId) {
+        return ResponseEntity.ok(orderService.getOrdersByCorporateUserId(corporateUserId));
+    }
+
+    @PatchMapping("/{id}/status")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
+    public ResponseEntity<OrderResponse> updateOrderStatus(@PathVariable Long id, @RequestParam String status) {
+        return ResponseEntity.ok(orderService.updateOrderStatus(id, status));
+    }
+
     @GetMapping
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
     public ResponseEntity<List<OrderResponse>> getAllOrders() {
         return ResponseEntity.ok(orderService.getAllOrders());
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<OrderResponse> updateOrder(@PathVariable Long id, @RequestBody OrderRequest request) {
+        return ResponseEntity.ok(orderService.updateOrder(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteOrder(@PathVariable Long id) {
+        orderService.deleteOrder(id);
+        return ResponseEntity.ok().build();
     }
 }
 
@@ -1507,11 +2070,15 @@ public class StoreController {
     private final StoreService storeService;
     public StoreController(StoreService storeService) { this.storeService = storeService; }
     @PostMapping
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
     public ResponseEntity<StoreResponse> createStore(@RequestBody StoreRequest request) { return new ResponseEntity<>(storeService.createStore(request), HttpStatus.CREATED); }
     @GetMapping("/{id}")
     public ResponseEntity<StoreResponse> getStoreById(@PathVariable Long id) { return ResponseEntity.ok(storeService.getStoreById(id)); }
     @GetMapping
     public ResponseEntity<List<StoreResponse>> getAllStores() { return ResponseEntity.ok(storeService.getAllStores()); }
+    @PatchMapping("/{id}/toggle")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<StoreResponse> toggleStoreStatus(@PathVariable Long id) { return ResponseEntity.ok(storeService.toggleStoreStatus(id)); }
 }
 
 
@@ -1531,6 +2098,7 @@ public class CategoryController {
     private final CategoryService categoryService;
     public CategoryController(CategoryService categoryService) { this.categoryService = categoryService; }
     @PostMapping
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<CategoryResponse> createCategory(@RequestBody CategoryRequest request) { return new ResponseEntity<>(categoryService.createCategory(request), HttpStatus.CREATED); }
     @GetMapping("/{id}")
     public ResponseEntity<CategoryResponse> getCategoryById(@PathVariable Long id) { return ResponseEntity.ok(categoryService.getCategoryById(id)); }
@@ -1551,6 +2119,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/shipments")
+@org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
 public class ShipmentController {
     private final ShipmentService shipmentService;
     public ShipmentController(ShipmentService shipmentService) { this.shipmentService = shipmentService; }
@@ -1579,6 +2148,7 @@ public class ReviewController {
     private final ReviewService reviewService;
     public ReviewController(ReviewService reviewService) { this.reviewService = reviewService; }
     @PostMapping
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('INDIVIDUAL')")
     public ResponseEntity<ReviewResponse> createReview(@RequestBody ReviewRequest request) { return new ResponseEntity<>(reviewService.createReview(request), HttpStatus.CREATED); }
     @GetMapping("/{id}")
     public ResponseEntity<ReviewResponse> getReviewById(@PathVariable Long id) { return ResponseEntity.ok(reviewService.getReviewById(id)); }
@@ -1720,6 +2290,170 @@ public class ChatController {
 }
 
 
+--- FILE: ./src/main/java/com/example/ecommercebackend/controller/DashboardController.java ---
+package com.example.ecommercebackend.controller;
+
+import com.example.ecommercebackend.service.QueryExecutionService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/dashboard")
+public class DashboardController {
+
+    private final QueryExecutionService queryExecutionService;
+
+    public DashboardController(QueryExecutionService queryExecutionService) {
+        this.queryExecutionService = queryExecutionService;
+    }
+
+    @GetMapping("/stats")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, Object>> getDashboardStats() {
+        Map<String, Object> stats = new HashMap<>();
+
+        try {
+            // KPI: Total Products
+            List<Map<String, Object>> prodCount = queryExecutionService.executeReadOnlyQuery(
+                "SELECT COUNT(*) AS total FROM products"
+            );
+            stats.put("totalProducts", prodCount.get(0).get("total"));
+
+            // KPI: Total Reviews
+            List<Map<String, Object>> revCount = queryExecutionService.executeReadOnlyQuery(
+                "SELECT COUNT(*) AS total FROM reviews"
+            );
+            stats.put("totalReviews", revCount.get(0).get("total"));
+
+            // KPI: Total Users
+            List<Map<String, Object>> userCount = queryExecutionService.executeReadOnlyQuery(
+                "SELECT COUNT(*) AS total FROM users"
+            );
+            stats.put("totalUsers", userCount.get(0).get("total"));
+
+            // KPI: Average Rating
+            List<Map<String, Object>> avgRating = queryExecutionService.executeReadOnlyQuery(
+                "SELECT ROUND(AVG(rating)::numeric, 2) AS avg FROM reviews"
+            );
+            stats.put("averageRating", avgRating.get(0).get("avg"));
+
+            // Chart 1: Top 10 Products by Review Count
+            List<Map<String, Object>> topProducts = queryExecutionService.executeReadOnlyQuery(
+                "SELECT p.name, COUNT(r.id) AS review_count FROM products p " +
+                "LEFT JOIN reviews r ON p.id = r.product_id " +
+                "GROUP BY p.name ORDER BY review_count DESC LIMIT 10"
+            );
+            stats.put("topProductsByReviews", topProducts);
+
+            // Chart 2: Rating Distribution (1-5 stars)
+            List<Map<String, Object>> ratingDist = queryExecutionService.executeReadOnlyQuery(
+                "SELECT rating, COUNT(*) AS count FROM reviews GROUP BY rating ORDER BY rating"
+            );
+            stats.put("ratingDistribution", ratingDist);
+
+            // Chart 3: Top 5 Categories by Product Count
+            List<Map<String, Object>> topCats = queryExecutionService.executeReadOnlyQuery(
+                "SELECT c.name AS category, COUNT(p.id) AS product_count FROM categories c " +
+                "LEFT JOIN products p ON c.id = p.category_id " +
+                "GROUP BY c.name ORDER BY product_count DESC LIMIT 5"
+            );
+            stats.put("topCategories", topCats);
+
+            // KPI: Total Revenue
+            List<Map<String, Object>> revenue = queryExecutionService.executeReadOnlyQuery(
+                "SELECT SUM(total_amount) AS total FROM orders"
+            );
+            stats.put("totalRevenue", revenue.get(0).get("total"));
+
+            // Alert: Low Stock Products
+            List<Map<String, Object>> lowStock = queryExecutionService.executeReadOnlyQuery(
+                "SELECT name, stock_quantity FROM products WHERE stock_quantity < 10 ORDER BY stock_quantity ASC LIMIT 10"
+            );
+            stats.put("lowStockAlerts", lowStock);
+
+        } catch (Exception e) {
+            stats.put("error", "Failed to fetch some stats: " + e.getMessage());
+        }
+
+        return ResponseEntity.ok(stats);
+    }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/controller/CartController.java ---
+package com.example.ecommercebackend.controller;
+
+import com.example.ecommercebackend.dto.response.CartResponse;
+import com.example.ecommercebackend.service.CartService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/carts")
+public class CartController {
+    private final CartService cartService;
+
+    public CartController(CartService cartService) {
+        this.cartService = cartService;
+    }
+
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<CartResponse> getCart(@PathVariable Long userId) {
+        return ResponseEntity.ok(cartService.getCartByUserId(userId));
+    }
+
+    @PostMapping("/user/{userId}/add")
+    public ResponseEntity<CartResponse> addToCart(@PathVariable Long userId, @RequestParam Long productId, @RequestParam Integer quantity) {
+        return ResponseEntity.ok(cartService.addToCart(userId, productId, quantity));
+    }
+
+    @DeleteMapping("/user/{userId}/remove/{cartItemId}")
+    public ResponseEntity<CartResponse> removeFromCart(@PathVariable Long userId, @PathVariable Long cartItemId) {
+        return ResponseEntity.ok(cartService.removeFromCart(userId, cartItemId));
+    }
+
+    @DeleteMapping("/user/{userId}/clear")
+    public ResponseEntity<Void> clearCart(@PathVariable Long userId) {
+        cartService.clearCart(userId);
+        return ResponseEntity.ok().build();
+    }
+}
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/controller/AuditLogController.java ---
+package com.example.ecommercebackend.controller;
+
+import com.example.ecommercebackend.model.AuditLog;
+import com.example.ecommercebackend.repository.AuditLogRepository;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/audit")
+public class AuditLogController {
+
+    private final AuditLogRepository auditLogRepository;
+
+    public AuditLogController(AuditLogRepository auditLogRepository) {
+        this.auditLogRepository = auditLogRepository;
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping
+    public ResponseEntity<List<AuditLog>> getAllLogs() {
+        return ResponseEntity.ok(auditLogRepository.findAll());
+    }
+}
+
+
 --- FILE: ./src/main/java/com/example/ecommercebackend/config/OpenApiConfig.java ---
 package com.example.ecommercebackend.config;
 
@@ -1773,7 +2507,11 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import java.util.Arrays;
+import java.util.List;
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
@@ -1796,8 +2534,21 @@ public class SecurityConfig {
     @Bean
     public PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
     @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(List.of("http://localhost:4200"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Cache-Control", "Content-Type"));
+        configuration.setAllowCredentials(true);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
+
+    @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http.csrf(AbstractHttpConfigurer::disable)
+        http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
@@ -1852,7 +2603,7 @@ public class DataSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        if (userRepository.count() == 0) {
+        if (userRepository.findByUsername("admin").isEmpty()) {
             User admin = new User();
             admin.setUsername("admin");
             admin.setPassword(passwordEncoder.encode("admin"));
@@ -1860,6 +2611,26 @@ public class DataSeeder implements CommandLineRunner {
             admin.setRole(UserRole.ADMIN);
             userRepository.save(admin);
             System.out.println("Mock Admin user created: admin / admin");
+        }
+
+        if (userRepository.findByUsername("corporate").isEmpty()) {
+            User corporate = new User();
+            corporate.setUsername("corporate");
+            corporate.setPassword(passwordEncoder.encode("corporate"));
+            corporate.setEmail("corporate@example.com");
+            corporate.setRole(UserRole.CORPORATE);
+            userRepository.save(corporate);
+            System.out.println("Mock Corporate user created: corporate / corporate");
+        }
+
+        if (userRepository.findByUsername("individual").isEmpty()) {
+            User individual = new User();
+            individual.setUsername("individual");
+            individual.setPassword(passwordEncoder.encode("individual"));
+            individual.setEmail("individual@example.com");
+            individual.setRole(UserRole.INDIVIDUAL);
+            userRepository.save(individual);
+            System.out.println("Mock Individual user created: individual / individual");
         }
     }
 }
@@ -1923,8 +2694,14 @@ public record OrderItemRequest(Long productId, Integer quantity) {}
 --- FILE: ./src/main/java/com/example/ecommercebackend/dto/request/OrderRequest.java ---
 package com.example.ecommercebackend.dto.request;
 import java.util.List;
-public record OrderRequest(Long userId, String paymentMethod, List<OrderItemRequest> items) {}
 
+public record OrderRequest(
+    Long userId, 
+    String paymentMethod, 
+    String shippingAddress, 
+    String billingAddress, 
+    List<OrderItemRequest> items
+) {}
 
 --- FILE: ./src/main/java/com/example/ecommercebackend/dto/request/StoreRequest.java ---
 package com.example.ecommercebackend.dto.request;
@@ -2019,13 +2796,6 @@ import java.math.BigDecimal;
 public record ProductResponse(Long id, String sku, String name, String description, BigDecimal price, Integer stockQuantity, Long storeId, Long categoryId) {}
 
 
---- FILE: ./src/main/java/com/example/ecommercebackend/dto/response/OrderResponse.java ---
-package com.example.ecommercebackend.dto.response;
-import com.example.ecommercebackend.model.enums.OrderStatus;
-import java.time.LocalDateTime;
-public record OrderResponse(Long id, Long userId, LocalDateTime orderDate, OrderStatus status, String paymentMethod) {}
-
-
 --- FILE: ./src/main/java/com/example/ecommercebackend/dto/response/StoreResponse.java ---
 package com.example.ecommercebackend.dto.response;
 public record StoreResponse(Long id, String name, String description, boolean isOpen, Long corporateUserId) {}
@@ -2109,6 +2879,86 @@ public class ChatResponse {
         this.visualizationCode = visualizationCode;
     }
 }
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/dto/response/OrderItemResponse.java ---
+package com.example.ecommercebackend.dto.response;
+
+public record OrderItemResponse(Long id, Long productId, String productName, Integer quantity, java.math.BigDecimal unitPrice) {}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/dto/response/CartResponse.java ---
+package com.example.ecommercebackend.dto.response;
+
+import java.util.List;
+
+public class CartResponse {
+    private Long id;
+    private Long userId;
+    private List<CartItemResponse> items;
+
+    public CartResponse(Long id, Long userId, List<CartItemResponse> items) {
+        this.id = id;
+        this.userId = userId;
+        this.items = items;
+    }
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public Long getUserId() { return userId; }
+    public void setUserId(Long userId) { this.userId = userId; }
+    public List<CartItemResponse> getItems() { return items; }
+    public void setItems(List<CartItemResponse> items) { this.items = items; }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/dto/response/CartItemResponse.java ---
+package com.example.ecommercebackend.dto.response;
+
+public class CartItemResponse {
+    private Long id;
+    private ProductDto product;
+    private Integer quantity;
+
+    public CartItemResponse(Long id, ProductDto product, Integer quantity) {
+        this.id = id;
+        this.product = product;
+        this.quantity = quantity;
+    }
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public ProductDto getProduct() { return product; }
+    public void setProduct(ProductDto product) { this.product = product; }
+
+    public static class ProductDto {
+        private Long id;
+        private String name;
+        private java.math.BigDecimal price;
+
+        public ProductDto(Long id, String name, java.math.BigDecimal price) {
+            this.id = id;
+            this.name = name;
+            this.price = price;
+        }
+
+        public Long getId() { return id; }
+        public void setId(Long id) { this.id = id; }
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+        public java.math.BigDecimal getPrice() { return price; }
+        public void setPrice(java.math.BigDecimal price) { this.price = price; }
+    }
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/dto/response/OrderResponse.java ---
+package com.example.ecommercebackend.dto.response;
+import com.example.ecommercebackend.model.enums.OrderStatus;
+import java.time.LocalDateTime;
+import java.util.List;
+
+public record OrderResponse(Long id, Long userId, String username, @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss") LocalDateTime orderDate, OrderStatus status, String paymentMethod, List<OrderItemResponse> items) {}
 
 
 --- FILE: ./src/main/java/com/example/ecommercebackend/security/CustomUserDetails.java ---
@@ -2287,6 +3137,53 @@ public class LoggingAspect {
 }
 
 
+--- FILE: ./src/main/java/com/example/ecommercebackend/aspect/AuditLoggingAspect.java ---
+package com.example.ecommercebackend.aspect;
+
+import com.example.ecommercebackend.model.AuditLog;
+import com.example.ecommercebackend.repository.AuditLogRepository;
+import org.aspectj.lang.JoinPoint;
+import org.aspectj.lang.annotation.AfterReturning;
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Pointcut;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
+
+@Aspect
+@Component
+public class AuditLoggingAspect {
+
+    private final AuditLogRepository auditLogRepository;
+
+    public AuditLoggingAspect(AuditLogRepository auditLogRepository) {
+        this.auditLogRepository = auditLogRepository;
+    }
+
+    @Pointcut("@annotation(org.springframework.web.bind.annotation.PostMapping) || " +
+              "@annotation(org.springframework.web.bind.annotation.PutMapping) || " +
+              "@annotation(org.springframework.web.bind.annotation.DeleteMapping) || " +
+              "@annotation(org.springframework.web.bind.annotation.PatchMapping)")
+    public void writeOperations() {}
+
+    @AfterReturning("writeOperations()")
+    public void logAfter(JoinPoint joinPoint) {
+        String username = "System/Anonymous";
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && !auth.getPrincipal().equals("anonymousUser")) {
+            username = auth.getName(); // email
+        }
+
+        String methodName = joinPoint.getSignature().getName();
+        String className = joinPoint.getTarget().getClass().getSimpleName();
+        String details = "Executed " + className + "." + methodName;
+
+        AuditLog log = new AuditLog("WRITE_OPERATION", username, details);
+        auditLogRepository.save(log);
+    }
+}
+
+
 --- FILE: ./src/main/resources/application.properties ---
 spring.application.name=ecommercebackend
 
@@ -2301,9 +3198,9 @@ spring.jpa.open-in-view=false
 # Disable Spring Security AuthenticationProvider warning
 logging.level.org.springframework.security.config.annotation.authentication.configuration.InitializeUserDetailsBeanManagerConfigurer=ERROR
 
-# Disable SpringDoc default endpoint warnings
-springdoc.api-docs.enabled=false
-springdoc.swagger-ui.enabled=false
+# Enable SpringDoc
+springdoc.api-docs.enabled=true
+springdoc.swagger-ui.enabled=true
 
 
 --- FILE: ./src/main/resources/application-postgres.properties ---
@@ -2457,6 +3354,49 @@ public class LoggingAspectTest {
         // Act & Assert
         assertThrows(IllegalArgumentException.class, () -> loggingAspect.logAround(joinPoint));
         verify(joinPoint, times(1)).proceed();
+    }
+}
+
+
+--- FILE: ./src/test/java/com/example/ecommercebackend/CartSerializationTest.java ---
+package com.example.ecommercebackend;
+
+import com.example.ecommercebackend.model.Cart;
+import com.example.ecommercebackend.model.CartItem;
+import com.example.ecommercebackend.model.Product;
+import com.example.ecommercebackend.model.User;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+
+public class CartSerializationTest {
+
+    @Test
+    public void testSerialization() throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        
+        Cart cart = new Cart();
+        cart.setId(1L);
+        
+        User user = new User();
+        user.setId(1L);
+        cart.setUser(user);
+        
+        Product product = new Product();
+        product.setId(10L);
+        product.setName("Test Product");
+        
+        CartItem item = new CartItem();
+        item.setId(100L);
+        item.setCart(cart);
+        item.setProduct(product);
+        item.setQuantity(2);
+        
+        cart.setItems(List.of(item));
+        
+        String json = mapper.writeValueAsString(cart);
+        System.out.println(json);
     }
 }
 

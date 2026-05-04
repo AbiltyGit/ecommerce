@@ -89,7 +89,9 @@ with engine.connect() as conn:
             """), {
                 "username": uid,
                 "email": f"{uid}@example.com",
-                "password": "hashed_password_placeholder" 
+                # BCrypt hash for "password"
+                "password": "$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HCGFJZ3/GqA/vP2K3A/.u", 
+                "role": 'INDIVIDUAL'
             })
     conn.commit()
 

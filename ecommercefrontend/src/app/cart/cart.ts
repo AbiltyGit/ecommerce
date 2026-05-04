@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
@@ -15,8 +15,11 @@ export class CartComponent implements OnInit {
   userId = 0;
   removingId: number | null = null;
 
-  constructor(private http: HttpClient, private router: Router) {}
-
+constructor(
+    private http: HttpClient, 
+    private router: Router,
+    private cdr: ChangeDetectorRef // EKLENDİ
+  ) {}
   ngOnInit() {
     const userStr = localStorage.getItem('user');
     if (userStr) {
@@ -29,16 +32,16 @@ export class CartComponent implements OnInit {
   loadCart() {
     this.loading = true;
     this.http.get<any>(`/api/carts/user/${this.userId}`).subscribe({
-      next: (data) => { this.cart = data; this.loading = false; },
-      error: () => { this.cart = null; this.loading = false; }
+      next: (data) => { this.cart = data; this.loading = false; this.cdr.detectChanges(); },
+      error: () => { this.cart = null; this.loading = false; this.cdr.detectChanges(); }
     });
   }
 
   removeItem(itemId: number) {
     this.removingId = itemId;
     this.http.delete(`/api/carts/user/${this.userId}/remove/${itemId}`).subscribe({
-      next: () => { this.removingId = null; this.loadCart(); },
-      error: () => { this.removingId = null; }
+      next: () => { this.removingId = null; this.loadCart(); this.cdr.detectChanges(); },
+      error: () => { this.removingId = null; this.cdr.detectChanges(); }
     });
   }
 

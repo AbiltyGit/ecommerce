@@ -12,6 +12,7 @@ import { AdminOrders } from './admin-orders/admin-orders';
 import { AdminUsers } from './admin-users/admin-users';
 import { AdminStores } from './admin-stores/admin-stores';
 import { AdminAudit } from './admin-audit/admin-audit';
+import { AdminCategories } from './admin-categories/admin-categories';
 import { IndividualDashboard } from './individual-dashboard/individual-dashboard';
 import { Shell } from './shell/shell';
 import { authGuard } from './guards/auth-guard';
@@ -79,6 +80,12 @@ export const routes: Routes = [
       {
         path: 'admin/audit',
         component: AdminAudit,
+        canActivate: [roleGuard],
+        data: { expectedRoles: ['ADMIN'] }
+      },
+      {
+        path: 'admin/categories',
+        component: AdminCategories,
         canActivate: [roleGuard],
         data: { expectedRoles: ['ADMIN'] }
       },

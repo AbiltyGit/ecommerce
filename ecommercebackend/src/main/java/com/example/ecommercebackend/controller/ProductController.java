@@ -25,8 +25,13 @@ public class ProductController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ProductResponse>> getAllProducts() {
-        return ResponseEntity.ok(productService.getAllProducts());
+    public ResponseEntity<org.springframework.data.domain.Page<ProductResponse>> getAllProducts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(defaultValue = "newest") String sortBy) {
+        return ResponseEntity.ok(productService.getProducts(page, size, search, categoryId, sortBy));
     }
 
     @GetMapping("/store/{storeId}")

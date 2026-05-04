@@ -1,4 +1,4 @@
---- FRONTEND CONTEXT GENERATED ON Paz 26 Nis 2026 22:26:31 +03 ---
+--- FRONTEND CONTEXT GENERATED ON Pzt 04 May 2026 05:09:13 +03 ---
 
 
 --- FILE: ./.vscode/extensions.json ---
@@ -295,12 +295,101 @@ export const appConfig: ApplicationConfig = {
 import { Routes } from '@angular/router';
 import { Login } from './login/login';
 import { Chat } from './chat/chat';
+import { Dashboard } from './dashboard/dashboard';
+import { Products } from './products/products';
+import { CartComponent } from './cart/cart';
+import { Checkout } from './checkout/checkout';
+import { OrderHistory } from './order-history/order-history';
+import { AdminDashboard } from './admin-dashboard/admin-dashboard';
+import { AdminProducts } from './admin-products/admin-products';
+import { AdminOrders } from './admin-orders/admin-orders';
+import { AdminUsers } from './admin-users/admin-users';
+import { AdminStores } from './admin-stores/admin-stores';
+import { AdminAudit } from './admin-audit/admin-audit';
+import { AdminCategories } from './admin-categories/admin-categories';
+import { IndividualDashboard } from './individual-dashboard/individual-dashboard';
+import { Shell } from './shell/shell';
 import { authGuard } from './guards/auth-guard';
+import { roleGuard } from './guards/role-guard';
 
 export const routes: Routes = [
+  // Public route
   { path: 'login', component: Login },
-  { path: 'chat', component: Chat, canActivate: [authGuard] },
-  { path: '', redirectTo: '/login', pathMatch: 'full' },
+
+  // Authenticated shell — all protected routes live here as children
+  {
+    path: '',
+    component: Shell,
+    canActivate: [authGuard],
+    children: [
+      // Individual
+      { path: 'products', component: Products },
+      { path: 'cart', component: CartComponent },
+      { path: 'checkout', component: Checkout },
+      { path: 'order-history', component: OrderHistory },
+      { path: 'my-dashboard', component: IndividualDashboard },
+      { path: 'chat', component: Chat },
+
+      // Admin (platform-wide analytics)
+      {
+        path: 'dashboard',
+        component: Dashboard,
+        canActivate: [roleGuard],
+        data: { expectedRoles: ['ADMIN'] }
+      },
+
+      // Corporate + Admin shared panels
+      {
+        path: 'admin/dashboard',
+        component: AdminDashboard,
+        canActivate: [roleGuard],
+        data: { expectedRoles: ['ADMIN', 'CORPORATE'] }
+      },
+      {
+        path: 'admin/products',
+        component: AdminProducts,
+        canActivate: [roleGuard],
+        data: { expectedRoles: ['ADMIN', 'CORPORATE'] }
+      },
+      {
+        path: 'admin/orders',
+        component: AdminOrders,
+        canActivate: [roleGuard],
+        data: { expectedRoles: ['ADMIN', 'CORPORATE'] }
+      },
+
+      // Admin-only panels
+      {
+        path: 'admin/users',
+        component: AdminUsers,
+        canActivate: [roleGuard],
+        data: { expectedRoles: ['ADMIN'] }
+      },
+      {
+        path: 'admin/stores',
+        component: AdminStores,
+        canActivate: [roleGuard],
+        data: { expectedRoles: ['ADMIN'] }
+      },
+      {
+        path: 'admin/audit',
+        component: AdminAudit,
+        canActivate: [roleGuard],
+        data: { expectedRoles: ['ADMIN'] }
+      },
+      {
+        path: 'admin/categories',
+        component: AdminCategories,
+        canActivate: [roleGuard],
+        data: { expectedRoles: ['ADMIN'] }
+      },
+
+      // Default redirect for authenticated users
+      { path: '', redirectTo: 'products', pathMatch: 'full' },
+    ]
+  },
+
+  // Catch-all
   { path: '**', redirectTo: '/login' }
 ];
 
@@ -359,8 +448,17 @@ export class Login {
     this.error = '';
     
     this.authService.login({ username: this.username, password: this.password }).subscribe({
-      next: () => {
-        this.router.navigate(['/chat']);
+      next: (res) => {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const role = user.role;
+
+        if (role === 'ADMIN') {
+          this.router.navigate(['/dashboard']);
+        } else if (role === 'CORPORATE') {
+          this.router.navigate(['/admin/dashboard']);
+        } else {
+          this.router.navigate(['/products']);
+        }
       },
       error: (err) => {
         this.error = 'Invalid credentials or connection error.';
@@ -444,9 +542,10 @@ describe('Chat', () => {
 
 
 --- FILE: ./src/app/chat/chat.ts ---
-import { Component, ElementRef, ViewChild, AfterViewChecked } from '@angular/core';
+import { Component, ElementRef, ViewChild, AfterViewChecked, NgZone, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { ChatService, ChatMessage } from '../services/chat';
 import { AuthService } from '../services/auth';
 import { PlotlyRender } from '../plotly-render/plotly-render';
@@ -466,10 +565,16 @@ export class Chat implements AfterViewChecked {
 
   constructor(
     private chatService: ChatService,
-    private authService: AuthService
+    private authService: AuthService,
+    private router: Router,
+    private zone: NgZone,
+    private cdr: ChangeDetectorRef
   ) {
-    // If we wanted to load history immediately:
-    this.messages = this.chatService.getHistory();
+    this.messages = [...this.chatService.getHistory()];
+  }
+
+  goToDashboard() {
+    this.router.navigate(['/dashboard']);
   }
 
   ngAfterViewChecked() {
@@ -491,7 +596,7 @@ export class Chat implements AfterViewChecked {
   }
 
   formatMessage(content: string): string {
-    // Basic Markdown formatting for bold and line breaks
+    if (!content) return '';
     return content
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\n/g, '<br>');
@@ -505,30 +610,41 @@ export class Chat implements AfterViewChecked {
     
     const newMsg: ChatMessage = { role: 'user', content: userMsg };
     this.chatService.addMessage(newMsg);
-    this.messages = this.chatService.getHistory();
+    this.messages = [...this.chatService.getHistory()];
     
     this.loading = true;
+    this.cdr.detectChanges();
+    
+    console.log("DEBUG: Sending request to backend...");
     
     this.chatService.askQuestion(userMsg).subscribe({
       next: (res) => {
-        const assistantMsg: ChatMessage & { visualizationCode?: string, data?: any[] } = {
-          role: 'assistant',
-          content: res.answer,
-          visualizationCode: res.visualizationCode,
-          data: res.data
-        };
-        this.chatService.addMessage(assistantMsg);
-        this.messages = this.chatService.getHistory();
-        this.loading = false;
+        this.zone.run(() => {
+          console.log("DEBUG: Received response from backend:", res);
+          const assistantMsg: ChatMessage & { visualizationCode?: string, data?: any[] } = {
+            role: 'assistant',
+            content: res.answer || "No answer provided.",
+            visualizationCode: res.visualizationCode,
+            data: res.data
+          };
+          this.chatService.addMessage(assistantMsg);
+          this.messages = [...this.chatService.getHistory()];
+          this.loading = false;
+          this.cdr.detectChanges();
+        });
       },
       error: (err) => {
-        const errorMsg: ChatMessage = {
-          role: 'assistant',
-          content: 'Sorry, I encountered an error while connecting to the Agentic Bridge. Make sure both Java and Python servers are running.'
-        };
-        this.chatService.addMessage(errorMsg);
-        this.messages = this.chatService.getHistory();
-        this.loading = false;
+        this.zone.run(() => {
+          console.error("DEBUG: HTTP Request Error:", err);
+          const errorMsg: ChatMessage = {
+            role: 'assistant',
+            content: 'Sorry, I encountered an error while connecting to the Agentic Bridge. Check the browser console.'
+          };
+          this.chatService.addMessage(errorMsg);
+          this.messages = [...this.chatService.getHistory()];
+          this.loading = false;
+          this.cdr.detectChanges();
+        });
       }
     });
   }
@@ -536,144 +652,101 @@ export class Chat implements AfterViewChecked {
 
 
 --- FILE: ./src/app/chat/chat.html ---
-<div class="flex h-screen overflow-hidden w-full">
-  <!-- Sidebar -->
-  <aside class="w-64 glass-panel border-r border-white/5 flex flex-col h-full hidden md:flex shrink-0">
-    <div class="p-6 border-b border-white/5 flex items-center gap-3">
-      <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center">
+<div class="flex flex-col h-full relative overflow-hidden bg-slate-900/40">
+
+  <!-- Header -->
+  <header class="h-14 glass-panel border-b border-white/5 flex items-center justify-between px-6 z-10 shrink-0">
+    <h1 class="text-base font-semibold text-white flex items-center gap-2">
+      <span class="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.6)]"></span>
+      Ask the Database
+    </h1>
+    <div class="text-sm font-medium text-slate-400 flex items-center gap-2">
+      Powered by LangGraph
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+    </div>
+  </header>
+
+  <!-- Chat Messages -->
+  <div class="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 scroll-smooth" #scrollContainer>
+    <!-- Initial greeting -->
+    <div class="flex flex-col items-center justify-center text-center mt-12 mb-8 animate-fade-in" *ngIf="messages.length === 0">
+      <div class="w-20 h-20 rounded-full bg-gradient-to-tr from-indigo-500/20 to-purple-500/20 flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(99,102,241,0.15)]">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+      </div>
+      <h2 class="text-3xl font-bold text-white mb-3">How can I help you?</h2>
+      <p class="text-slate-400 max-w-md text-lg leading-relaxed">Ask anything about your e-commerce data. I can fetch reviews, analyze sales, and visualize metrics instantly.</p>
+      <div class="mt-10 flex flex-wrap justify-center gap-3 w-full max-w-2xl">
+        <button (click)="question = 'Show me the top 5 products by review count'; ask()" class="px-5 py-3 rounded-full bg-slate-800/50 border border-white/10 hover:border-indigo-500/50 hover:bg-indigo-500/10 text-sm font-medium text-slate-300 transition-all shadow-sm">Top 5 products by reviews</button>
+        <button (click)="question = 'What is the average rating for Beauty category?'; ask()" class="px-5 py-3 rounded-full bg-slate-800/50 border border-white/10 hover:border-purple-500/50 hover:bg-purple-500/10 text-sm font-medium text-slate-300 transition-all shadow-sm">Average rating in Beauty</button>
+      </div>
+    </div>
+
+    <!-- Messages Loop -->
+    <div *ngFor="let msg of messages" class="animate-fade-in flex flex-col w-full" [ngClass]="msg.role === 'user' ? 'items-end' : 'items-start'">
+      <div class="flex w-full" [ngClass]="msg.role === 'user' ? 'justify-end' : 'justify-start max-w-[95%] md:max-w-[85%]'">
+        <!-- AI Avatar -->
+        <div *ngIf="msg.role === 'assistant'" class="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 flex-shrink-0 flex items-center justify-center mr-4 mt-1 shadow-lg shadow-indigo-500/20">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        </div>
+        <div class="flex flex-col" [ngClass]="msg.role === 'user' ? 'max-w-[85%] md:max-w-[70%]' : 'w-full'">
+          <div class="p-5 rounded-2xl text-[15px] leading-relaxed shadow-sm" [ngClass]="msg.role === 'user' ? 'message-bubble-user text-white rounded-tr-sm' : 'message-bubble-ai text-slate-200 rounded-tl-sm'">
+            <div class="whitespace-pre-wrap ai-content" [innerHTML]="formatMessage(msg.content)"></div>
+          </div>
+          <!-- Plotly -->
+          <div *ngIf="msg.visualizationCode" class="mt-4 w-full">
+            <app-plotly-render [code]="msg.visualizationCode"></app-plotly-render>
+          </div>
+          <!-- Raw Data Table -->
+          <div *ngIf="msg.data && msg.data.length > 0" class="mt-3 text-xs text-slate-400 p-4 bg-slate-800/40 rounded-xl overflow-x-auto border border-white/5 backdrop-blur-sm">
+            <details>
+              <summary class="cursor-pointer hover:text-white font-medium transition-colors select-none">View Raw Data ({{msg.data.length}} rows)</summary>
+              <div class="mt-3 rounded-lg overflow-hidden border border-white/10">
+                <table class="w-full border-collapse text-left bg-slate-900/50">
+                  <thead class="bg-slate-800/80 text-slate-300">
+                    <tr><th *ngFor="let key of getObjectKeys(msg.data[0])" class="p-3 font-semibold border-b border-white/10">{{key}}</th></tr>
+                  </thead>
+                  <tbody class="divide-y divide-white/5">
+                    <tr *ngFor="let row of msg.data | slice:0:5" class="hover:bg-white/5 transition-colors">
+                      <td *ngFor="let key of getObjectKeys(row)" class="p-3 truncate max-w-[200px]">{{row[key]}}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div *ngIf="msg.data.length > 5" class="text-center mt-3 text-slate-500 font-medium">... and {{msg.data.length - 5}} more rows</div>
+            </details>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading dots -->
+    <div *ngIf="loading" class="animate-fade-in flex items-start w-full">
+      <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 flex-shrink-0 flex items-center justify-center mr-4 mt-1 shadow-lg shadow-indigo-500/20">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
       </div>
-      <h2 class="text-xl font-bold text-white tracking-tight">AI Analytics</h2>
+      <div class="p-5 rounded-2xl message-bubble-ai text-slate-200 rounded-tl-sm flex items-center gap-2 shadow-sm h-[58px]">
+        <div class="w-2.5 h-2.5 rounded-full bg-indigo-400 animate-bounce"></div>
+        <div class="w-2.5 h-2.5 rounded-full bg-purple-400 animate-bounce" style="animation-delay: 0.15s"></div>
+        <div class="w-2.5 h-2.5 rounded-full bg-indigo-400 animate-bounce" style="animation-delay: 0.3s"></div>
+      </div>
     </div>
-    <div class="flex-1 overflow-y-auto p-4 space-y-2">
-      <button class="w-full text-left px-4 py-3 rounded-xl bg-indigo-500/20 text-indigo-300 font-medium border border-indigo-500/30 flex items-center gap-3 transition-all shadow-sm">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg>
-        Data Exploration
+  </div>
+
+  <!-- Input -->
+  <div class="p-4 md:p-6 glass-panel border-t border-white/5 z-10 shrink-0">
+    <form (ngSubmit)="ask()" class="relative max-w-4xl mx-auto flex items-end gap-3">
+      <div class="relative w-full">
+        <input type="text" [(ngModel)]="question" name="question" [disabled]="loading"
+          class="w-full bg-slate-800/60 border border-white/10 px-6 py-4 rounded-2xl text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 shadow-inner backdrop-blur-md transition-all text-[15px]"
+          placeholder="Ask about your sales, users, or products..."
+          autocomplete="off">
+      </div>
+      <button type="submit" [disabled]="loading || !question.trim()"
+        class="w-14 h-14 shrink-0 bg-gradient-to-tr from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:from-slate-700 disabled:to-slate-700 disabled:opacity-50 text-white rounded-2xl flex items-center justify-center transition-all shadow-lg shadow-indigo-500/25">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" [class.animate-pulse]="loading"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
       </button>
-      <button class="w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 text-slate-400 font-medium transition-all flex items-center gap-3">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
-        Dashboards
-      </button>
-    </div>
-    <div class="p-4 border-t border-white/5">
-      <button (click)="logout()" class="w-full py-3 px-4 rounded-xl hover:bg-red-500/10 hover:text-red-400 text-slate-400 font-medium transition-colors flex items-center gap-3 justify-center">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-        Sign Out
-      </button>
-    </div>
-  </aside>
-
-  <!-- Main Chat Area -->
-  <main class="flex-1 flex flex-col h-full relative overflow-hidden bg-slate-900/40">
-    <!-- Header -->
-    <header class="h-16 glass-panel border-b border-white/5 flex items-center justify-between px-6 z-10 shrink-0">
-      <h1 class="text-lg font-semibold text-white flex items-center gap-2">
-        <span class="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse-slow shadow-[0_0_8px_rgba(74,222,128,0.6)]"></span>
-        Ask the Database
-      </h1>
-      <div class="text-sm font-medium text-slate-400 flex items-center gap-2">
-        Powered by LangGraph
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-      </div>
-    </header>
-
-    <!-- Chat Messages -->
-    <div class="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 scroll-smooth" #scrollContainer>
-      <!-- Initial greeting -->
-      <div class="flex flex-col items-center justify-center text-center mt-12 mb-8 animate-fade-in" *ngIf="messages.length === 0">
-        <div class="w-20 h-20 rounded-full bg-gradient-to-tr from-indigo-500/20 to-purple-500/20 flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(99,102,241,0.15)]">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-        </div>
-        <h2 class="text-3xl font-bold text-white mb-3">How can I help you?</h2>
-        <p class="text-slate-400 max-w-md text-lg leading-relaxed">Ask anything about your e-commerce data. I can fetch reviews, analyze sales, and visualize metrics instantly.</p>
-        <div class="mt-10 flex flex-wrap justify-center gap-3 w-full max-w-2xl">
-          <button (click)="question = 'Show me the top 5 products by review count'; ask()" class="px-5 py-3 rounded-full bg-slate-800/50 border border-white/10 hover:border-indigo-500/50 hover:bg-indigo-500/10 text-sm font-medium text-slate-300 transition-all shadow-sm">Top 5 products by reviews</button>
-          <button (click)="question = 'What is the average rating for Beauty category?'; ask()" class="px-5 py-3 rounded-full bg-slate-800/50 border border-white/10 hover:border-purple-500/50 hover:bg-purple-500/10 text-sm font-medium text-slate-300 transition-all shadow-sm">Average rating in Beauty</button>
-        </div>
-      </div>
-
-      <!-- Messages Loop -->
-      <div *ngFor="let msg of messages" class="animate-fade-in flex flex-col w-full" [ngClass]="msg.role === 'user' ? 'items-end' : 'items-start'">
-        
-        <div class="flex w-full" [ngClass]="msg.role === 'user' ? 'justify-end' : 'justify-start max-w-[95%] md:max-w-[85%]'">
-          <!-- AI Avatar -->
-          <div *ngIf="msg.role === 'assistant'" class="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 flex-shrink-0 flex items-center justify-center mr-4 mt-1 shadow-lg shadow-indigo-500/20">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-          </div>
-          
-          <div class="flex flex-col" [ngClass]="msg.role === 'user' ? 'max-w-[85%] md:max-w-[70%]' : 'w-full'">
-            <div class="p-5 rounded-2xl text-[15px] leading-relaxed shadow-sm" [ngClass]="msg.role === 'user' ? 'message-bubble-user text-white rounded-tr-sm' : 'message-bubble-ai text-slate-200 rounded-tl-sm'">
-              <!-- Formatted Text -->
-              <div class="whitespace-pre-wrap ai-content" [innerHTML]="formatMessage(msg.content)"></div>
-            </div>
-            
-            <!-- Plotly Rendering Area -->
-            <div *ngIf="msg.visualizationCode" class="mt-4 w-full">
-              <app-plotly-render [code]="msg.visualizationCode"></app-plotly-render>
-            </div>
-            
-            <!-- Raw Data Table (if data exists and is array) -->
-            <div *ngIf="msg.data && msg.data.length > 0" class="mt-3 text-xs text-slate-400 p-4 bg-slate-800/40 rounded-xl overflow-x-auto border border-white/5 backdrop-blur-sm">
-               <details>
-                 <summary class="cursor-pointer hover:text-white font-medium transition-colors select-none">View Raw Data ({{msg.data.length}} rows)</summary>
-                 <div class="mt-3 rounded-lg overflow-hidden border border-white/10">
-                   <table class="w-full border-collapse text-left bg-slate-900/50">
-                     <thead class="bg-slate-800/80 text-slate-300">
-                       <tr>
-                         <th *ngFor="let key of getObjectKeys(msg.data[0])" class="p-3 font-semibold border-b border-white/10">{{key}}</th>
-                       </tr>
-                     </thead>
-                     <tbody class="divide-y divide-white/5">
-                       <tr *ngFor="let row of msg.data | slice:0:5" class="hover:bg-white/5 transition-colors">
-                         <td *ngFor="let key of getObjectKeys(row)" class="p-3 truncate max-w-[200px]">{{row[key]}}</td>
-                       </tr>
-                     </tbody>
-                   </table>
-                 </div>
-                 <div *ngIf="msg.data.length > 5" class="text-center mt-3 text-slate-500 font-medium">... and {{msg.data.length - 5}} more rows</div>
-               </details>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Loading Indicator -->
-      <div *ngIf="loading" class="animate-fade-in flex items-start w-full">
-        <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 flex-shrink-0 flex items-center justify-center mr-4 mt-1 shadow-lg shadow-indigo-500/20">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-        </div>
-        <div class="p-5 rounded-2xl message-bubble-ai text-slate-200 rounded-tl-sm flex items-center gap-2 shadow-sm h-[58px]">
-          <div class="w-2.5 h-2.5 rounded-full bg-indigo-400 animate-bounce"></div>
-          <div class="w-2.5 h-2.5 rounded-full bg-purple-400 animate-bounce" style="animation-delay: 0.15s"></div>
-          <div class="w-2.5 h-2.5 rounded-full bg-indigo-400 animate-bounce" style="animation-delay: 0.3s"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Input Area -->
-    <div class="p-4 md:p-6 glass-panel border-t border-white/5 z-10 shrink-0">
-      <form (ngSubmit)="ask()" class="relative max-w-4xl mx-auto flex items-end gap-3">
-        <div class="relative w-full">
-          <input 
-            type="text" 
-            [(ngModel)]="question" 
-            name="question"
-            [disabled]="loading"
-            class="w-full bg-slate-800/60 border border-white/10 px-6 py-4 rounded-2xl text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 shadow-inner backdrop-blur-md transition-all text-[15px]"
-            placeholder="Ask about your sales, users, or products..."
-            autocomplete="off"
-          >
-        </div>
-        <button 
-          type="submit" 
-          [disabled]="loading || !question.trim()" 
-          class="w-14 h-14 shrink-0 bg-gradient-to-tr from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:from-slate-700 disabled:to-slate-700 disabled:opacity-50 text-white rounded-2xl flex items-center justify-center transition-all shadow-lg shadow-indigo-500/25"
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" [class.animate-pulse]="loading"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-        </button>
-      </form>
-    </div>
-  </main>
+    </form>
+  </div>
 </div>
 
 
@@ -706,7 +779,7 @@ describe('PlotlyRender', () => {
 
 
 --- FILE: ./src/app/plotly-render/plotly-render.ts ---
-import { Component, Input, AfterViewInit, ElementRef, ViewChild } from '@angular/core';
+import { Component, Input, AfterViewInit, ElementRef, ViewChild, OnChanges, SimpleChanges } from '@angular/core';
 import * as Plotly from 'plotly.js-dist-min';
 
 @Component({
@@ -714,38 +787,75 @@ import * as Plotly from 'plotly.js-dist-min';
   standalone: true,
   template: `<div #plotContainer [id]="plotId" class="w-full h-80 rounded-xl overflow-hidden glass-card my-4"></div>`
 })
-export class PlotlyRender implements AfterViewInit {
+export class PlotlyRender implements AfterViewInit, OnChanges {
   @Input() code!: string;
   @ViewChild('plotContainer') plotContainer!: ElementRef;
   
   plotId = 'plot_div_' + Math.random().toString(36).substring(2, 9);
+  private viewInitialized = false;
 
   ngAfterViewInit() {
+    this.viewInitialized = true;
     this.renderPlot();
   }
 
+  ngOnChanges(changes: SimpleChanges) {
+    if (changes['code'] && this.viewInitialized) {
+      this.renderPlot();
+    }
+  }
+
   private renderPlot() {
+    if (!this.code || this.code.trim() === '') return;
+
     try {
-      // AI returns code assuming target is 'plot_div' or similar generic names.
-      // We replace it with our dynamic ID to support multiple charts.
-      let executableCode = this.code;
-      if (executableCode.includes("'plot_div'")) {
-        executableCode = executableCode.replace(/'plot_div'/g, `'${this.plotId}'`);
-      } else if (executableCode.includes('"plot_div"')) {
-        executableCode = executableCode.replace(/"plot_div"/g, `'${this.plotId}'`);
-      } else {
-        // If the AI didn't specify the div ID properly, we try to catch Plotly.newPlot
-        executableCode = executableCode.replace(/Plotly\.newPlot\([^,]+,/g, `Plotly.newPlot('${this.plotId}',`);
+      let executableCode = this.code.trim();
+
+      // Strip markdown code fences if the AI wrapped the output
+      executableCode = executableCode
+        .replace(/^```[\w]*\n?/m, '')
+        .replace(/\n?```$/m, '')
+        .trim();
+
+      // Strategy 1: Try to parse as raw Plotly JSON {data: [...], layout: {...}}
+      if (executableCode.startsWith('{') || executableCode.startsWith('[')) {
+        try {
+          const spec = JSON.parse(executableCode);
+          const data = spec.data || (Array.isArray(spec) ? spec : [spec]);
+          const layout = {
+            paper_bgcolor: '#1a1a2e',
+            plot_bgcolor: '#1a1a2e',
+            font: { color: '#e2e8f0' },
+            ...(spec.layout || {})
+          };
+          (Plotly as any).newPlot(this.plotContainer.nativeElement, data, layout);
+          return;
+        } catch {
+          // Not valid JSON, fall through to JS eval
+        }
       }
-      
-      // Make Plotly global for the eval/Function execution
+
+      // Strategy 2: Execute as JavaScript, replacing the div target with our dynamic element
+      // Replace 'plot_div' string literal with our actual element reference
+      executableCode = executableCode.replace(
+        /Plotly\.newPlot\s*\(\s*['"]plot_div['"]/g,
+        `Plotly.newPlot(plotEl`
+      );
+
       (window as any).Plotly = Plotly;
-      
-      const renderFn = new Function('Plotly', executableCode);
-      renderFn(Plotly);
+      const renderFn = new Function('Plotly', 'plotEl', executableCode);
+      renderFn(Plotly, this.plotContainer.nativeElement);
+
     } catch (e) {
       console.error('Failed to render Plotly chart:', e);
-      this.plotContainer.nativeElement.innerHTML = '<div class="text-red-400 p-4 text-sm font-mono">Failed to render visualization.<br>Check console for details.</div>';
+      console.error('Code that failed:', this.code);
+      if (this.plotContainer?.nativeElement) {
+        this.plotContainer.nativeElement.innerHTML =
+          `<div style="color:#f87171;padding:16px;font-size:13px;font-family:monospace;">
+            ⚠️ Visualization render failed.<br><br>
+            <strong>Error:</strong> ${(e as Error).message}
+          </div>`;
+      }
     }
   }
 }
@@ -784,7 +894,7 @@ import { Router } from '@angular/router';
   providedIn: 'root'
 })
 export class AuthService {
-  private readonly API_URL = 'http://localhost:8080/api/auth';
+  private readonly API_URL = '/api/auth';
   private isAuthenticatedSubject = new BehaviorSubject<boolean>(this.hasToken());
   public isAuthenticated$ = this.isAuthenticatedSubject.asObservable();
 
@@ -881,6 +991,33 @@ export class ChatService {
 }
 
 
+--- FILE: ./src/app/services/dashboard.ts ---
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+
+export interface DashboardStats {
+  totalProducts: number;
+  totalReviews: number;
+  totalUsers: number;
+  averageRating: number;
+  topProductsByReviews: { name: string; review_count: number }[];
+  ratingDistribution: { rating: number; count: number }[];
+  topCategories: { category: string; product_count: number }[];
+}
+
+@Injectable({ providedIn: 'root' })
+export class DashboardService {
+  private readonly API_URL = 'http://localhost:8080/api/dashboard/stats';
+
+  constructor(private http: HttpClient) {}
+
+  getStats(): Observable<DashboardStats> {
+    return this.http.get<DashboardStats>(this.API_URL);
+  }
+}
+
+
 --- FILE: ./src/app/interceptors/auth-interceptor.spec.ts ---
 import { TestBed } from '@angular/core/testing';
 import { HttpInterceptorFn } from '@angular/common/http';
@@ -910,7 +1047,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const authService = inject(AuthService);
   const token = authService.getToken();
 
-  if (token) {
+  if (token && !req.url.includes('/api/auth/')) {
     const clonedReq = req.clone({
       headers: req.headers.set('Authorization', `Bearer ${token}`)
     });
@@ -958,6 +1095,2312 @@ export const authGuard: CanActivateFn = (route, state) => {
   return false;
 };
 
+
+--- FILE: ./src/app/guards/role-guard.ts ---
+import { CanActivateFn, Router } from '@angular/router';
+import { inject } from '@angular/core';
+
+export const roleGuard: CanActivateFn = (route, state) => {
+  const router = inject(Router);
+  const userStr = localStorage.getItem('user');
+  
+  if (!userStr) {
+    router.navigate(['/login']);
+    return false;
+  }
+
+  try {
+    const user = JSON.parse(userStr);
+    const expectedRoles: string[] = route.data['expectedRoles'] || [];
+    
+    // Check if user has any of the expected roles
+    const hasRole = user.roles && user.roles.some((role: string) => expectedRoles.includes(role));
+    
+    if (hasRole) {
+      return true;
+    } else {
+      // User doesn't have required role, redirect to appropriate default page
+      if (user.roles.includes('ADMIN')) {
+        router.navigate(['/dashboard']);
+      } else if (user.roles.includes('CORPORATE')) {
+        router.navigate(['/admin/dashboard']);
+      } else {
+        router.navigate(['/products']);
+      }
+      return false;
+    }
+  } catch (e) {
+    router.navigate(['/login']);
+    return false;
+  }
+};
+
+
+--- FILE: ./src/app/dashboard/dashboard.ts ---
+import { Component, OnInit, NgZone, ChangeDetectorRef } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
+import * as Plotly from 'plotly.js-dist-min';
+import { DashboardService, DashboardStats } from '../services/dashboard';
+import { AuthService } from '../services/auth';
+
+@Component({
+  selector: 'app-dashboard',
+  standalone: true,
+  imports: [CommonModule],
+  templateUrl: './dashboard.html'
+})
+export class Dashboard implements OnInit {
+  stats: DashboardStats | null = null;
+  loading = true;
+  error: string | null = null;
+
+  constructor(
+    private dashboardService: DashboardService,
+    private authService: AuthService,
+    private router: Router,
+    private zone: NgZone,
+    private cdr: ChangeDetectorRef
+  ) {}
+
+  ngOnInit(): void {
+    this.dashboardService.getStats().subscribe({
+      next: (data) => {
+        this.zone.run(() => {
+          this.stats = data;
+          this.loading = false;
+          this.cdr.detectChanges();
+          setTimeout(() => this.renderCharts(), 100);
+        });
+      },
+      error: (err) => {
+        this.zone.run(() => {
+          this.error = 'Failed to load dashboard data. Is the backend running?';
+          this.loading = false;
+          this.cdr.detectChanges();
+        });
+      }
+    });
+  }
+
+  logout() {
+    this.authService.logout();
+  }
+
+  goToChat() {
+    this.router.navigate(['/chat']);
+  }
+
+  private renderCharts(): void {
+    if (!this.stats) return;
+
+    const darkLayout = {
+      paper_bgcolor: 'rgba(15,15,35,0)',
+      plot_bgcolor: 'rgba(15,15,35,0)',
+      font: { color: '#cbd5e1', family: 'Inter, sans-serif', size: 12 },
+      margin: { t: 30, r: 20, b: 80, l: 50 },
+      xaxis: { gridcolor: 'rgba(255,255,255,0.05)', zerolinecolor: 'rgba(255,255,255,0.1)' },
+      yaxis: { gridcolor: 'rgba(255,255,255,0.05)', zerolinecolor: 'rgba(255,255,255,0.1)' },
+    };
+
+    // Chart 1: Top Products (Horizontal Bar)
+    const topProductEl = document.getElementById('chart-top-products');
+    if (topProductEl && this.stats.topProductsByReviews?.length) {
+      const names = this.stats.topProductsByReviews.map(p => p.name.length > 25 ? p.name.substring(0, 25) + '…' : p.name);
+      const counts = this.stats.topProductsByReviews.map(p => p.review_count);
+      (Plotly as any).newPlot(topProductEl, [{
+        x: counts,
+        y: names,
+        type: 'bar',
+        orientation: 'h',
+        marker: {
+          color: counts.map((_: any, i: number) => `hsl(${250 + i * 8}, 70%, ${65 - i * 2}%)`),
+          line: { color: 'rgba(255,255,255,0.1)', width: 1 }
+        }
+      }], { ...darkLayout, margin: { t: 30, r: 20, b: 40, l: 220 } }, { responsive: true, displayModeBar: false });
+    }
+
+    // Chart 2: Rating Distribution (Donut)
+    const ratingEl = document.getElementById('chart-rating-dist');
+    if (ratingEl && this.stats.ratingDistribution?.length) {
+      const labels = this.stats.ratingDistribution.map(r => `${r.rating} ⭐`);
+      const values = this.stats.ratingDistribution.map(r => r.count);
+      (Plotly as any).newPlot(ratingEl, [{
+        labels,
+        values,
+        type: 'pie',
+        hole: 0.55,
+        marker: { colors: ['#ef4444', '#f97316', '#eab308', '#22c55e', '#6366f1'] },
+        textinfo: 'label+percent',
+        textfont: { color: '#cbd5e1' }
+      }], { ...darkLayout, margin: { t: 30, r: 20, b: 20, l: 20 }, showlegend: false }, { responsive: true, displayModeBar: false });
+    }
+
+    // Chart 3: Top Categories (Vertical Bar)
+    const catEl = document.getElementById('chart-top-categories');
+    if (catEl && this.stats.topCategories?.length) {
+      const cats = this.stats.topCategories.map(c => c.category);
+      const counts2 = this.stats.topCategories.map(c => c.product_count);
+      (Plotly as any).newPlot(catEl, [{
+        x: cats,
+        y: counts2,
+        type: 'bar',
+        marker: {
+          color: '#818cf8',
+          opacity: 0.85,
+          line: { color: 'rgba(255,255,255,0.15)', width: 1 }
+        }
+      }], { ...darkLayout }, { responsive: true, displayModeBar: false });
+    }
+  }
+}
+
+
+--- FILE: ./src/app/dashboard/dashboard.html ---
+<div class="flex flex-col h-full overflow-y-auto bg-slate-900/40">
+
+  <!-- Header -->
+  <header class="h-14 glass-panel border-b border-white/5 flex items-center justify-between px-6 shrink-0 sticky top-0 z-10">
+    <h1 class="text-base font-semibold text-white flex items-center gap-2">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+      Analytics Dashboard
+    </h1>
+    <span class="text-sm text-slate-400">Live data from PostgreSQL</span>
+  </header>
+
+  <!-- Loading -->
+  <div *ngIf="loading" class="flex-1 flex items-center justify-center">
+    <div class="flex flex-col items-center gap-4">
+      <div class="w-12 h-12 rounded-full border-4 border-indigo-500/30 border-t-indigo-500 animate-spin"></div>
+      <p class="text-slate-400 text-sm">Fetching live analytics...</p>
+    </div>
+  </div>
+
+  <!-- Error -->
+  <div *ngIf="error" class="flex-1 flex items-center justify-center">
+    <div class="text-center p-8">
+      <div class="text-4xl mb-4">⚠️</div>
+      <p class="text-red-400 font-medium">{{ error }}</p>
+    </div>
+  </div>
+
+  <!-- Dashboard Content -->
+  <div *ngIf="stats && !loading" class="p-6 md:p-8 space-y-8">
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+
+      <div class="glass-card rounded-2xl p-5 border border-white/5 flex flex-col gap-2 hover:border-indigo-500/30 transition-all group">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Products</span>
+          <div class="w-8 h-8 rounded-lg bg-indigo-500/15 flex items-center justify-center group-hover:bg-indigo-500/25 transition-colors">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+          </div>
+        </div>
+        <p class="text-3xl font-bold text-white">{{ stats.totalProducts | number }}</p>
+        <p class="text-xs text-slate-500">Unique SKUs in database</p>
+      </div>
+
+      <div class="glass-card rounded-2xl p-5 border border-white/5 flex flex-col gap-2 hover:border-purple-500/30 transition-all group">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Reviews</span>
+          <div class="w-8 h-8 rounded-lg bg-purple-500/15 flex items-center justify-center group-hover:bg-purple-500/25 transition-colors">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </div>
+        </div>
+        <p class="text-3xl font-bold text-white">{{ stats.totalReviews | number }}</p>
+        <p class="text-xs text-slate-500">Customer review records</p>
+      </div>
+
+      <div class="glass-card rounded-2xl p-5 border border-white/5 flex flex-col gap-2 hover:border-cyan-500/30 transition-all group">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Users</span>
+          <div class="w-8 h-8 rounded-lg bg-cyan-500/15 flex items-center justify-center group-hover:bg-cyan-500/25 transition-colors">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+        </div>
+        <p class="text-3xl font-bold text-white">{{ stats.totalUsers | number }}</p>
+        <p class="text-xs text-slate-500">Registered customer accounts</p>
+      </div>
+
+      <div class="glass-card rounded-2xl p-5 border border-white/5 flex flex-col gap-2 hover:border-yellow-500/30 transition-all group">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Avg. Rating</span>
+          <div class="w-8 h-8 rounded-lg bg-yellow-500/15 flex items-center justify-center group-hover:bg-yellow-500/25 transition-colors">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#eab308" stroke="#eab308" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </div>
+        </div>
+        <p class="text-3xl font-bold text-white">{{ stats.averageRating }}</p>
+        <p class="text-xs text-slate-500">Average across all reviews</p>
+      </div>
+
+    </div>
+
+    <!-- Charts Row 1 -->
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+      <div class="lg:col-span-3 glass-card rounded-2xl p-6 border border-white/5">
+        <h3 class="text-base font-semibold text-slate-200 mb-1">Top 10 Products by Review Count</h3>
+        <p class="text-xs text-slate-500 mb-4">Products with the most customer feedback</p>
+        <div id="chart-top-products" class="w-full" style="height: 340px;"></div>
+      </div>
+      <div class="lg:col-span-2 glass-card rounded-2xl p-6 border border-white/5">
+        <h3 class="text-base font-semibold text-slate-200 mb-1">Rating Distribution</h3>
+        <p class="text-xs text-slate-500 mb-4">Breakdown of 1–5 star reviews</p>
+        <div id="chart-rating-dist" class="w-full" style="height: 340px;"></div>
+      </div>
+    </div>
+
+    <!-- Charts Row 2 -->
+    <div class="glass-card rounded-2xl p-6 border border-white/5">
+      <h3 class="text-base font-semibold text-slate-200 mb-1">Products by Category</h3>
+      <p class="text-xs text-slate-500 mb-4">Number of distinct products per category</p>
+      <div id="chart-top-categories" class="w-full" style="height: 280px;"></div>
+    </div>
+
+  </div>
+</div>
+
+
+--- FILE: ./src/app/products/products.ts ---
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
+import { RouterModule, Router } from '@angular/router';
+import { FormsModule } from '@angular/forms';
+import { AuthService } from '../services/auth';
+
+@Component({
+  selector: 'app-products',
+  standalone: true,
+  imports: [CommonModule, RouterModule, FormsModule],
+  templateUrl: './products.html'
+})
+export class Products implements OnInit {
+  products: any[] = [];
+  categories: any[] = [];
+  
+  searchQuery: string = '';
+  selectedCategoryId: number | '' = '';
+  sortBy: string = 'newest';
+  
+  userId: number = 0;
+  
+  currentPage: number = 0;
+  totalPages: number = 0;
+  pageSize: number = 12;
+  totalElements: number = 0;
+
+  constructor(
+    private http: HttpClient,
+    private router: Router,
+    private authService: AuthService
+  ) {}
+  
+  ngOnInit() {
+    // Get user id from localStorage
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        this.userId = user.id;
+      } catch (e) {}
+    }
+
+    this.fetchCategories();
+    this.fetchProducts();
+  }
+
+  fetchCategories() {
+    this.http.get<any[]>('/api/categories').subscribe({
+      next: (data) => this.categories = data,
+      error: (err) => console.error('Failed to load categories', err)
+    });
+  }
+
+  fetchProducts() {
+    let url = `/api/products?page=${this.currentPage}&size=${this.pageSize}&sortBy=${this.sortBy}`;
+    if (this.searchQuery.trim() !== '') {
+      url += `&search=${encodeURIComponent(this.searchQuery.trim())}`;
+    }
+    if (this.selectedCategoryId !== '') {
+      url += `&categoryId=${this.selectedCategoryId}`;
+    }
+
+    this.http.get<any>(url).subscribe({
+      next: (data) => {
+        this.products = data.content;
+        this.totalPages = data.totalPages;
+        this.totalElements = data.totalElements;
+      },
+      error: (err) => console.error('Failed to load products', err)
+    });
+  }
+
+  applyFilters() {
+    this.currentPage = 0;
+    this.fetchProducts();
+  }
+
+  getCategoryName(categoryId: number): string {
+    const category = this.categories.find(c => c.id === categoryId);
+    return category ? category.name : 'Uncategorized';
+  }
+
+  nextPage() {
+    if (this.currentPage < this.totalPages - 1) {
+      this.currentPage++;
+      this.fetchProducts();
+    }
+  }
+
+  prevPage() {
+    if (this.currentPage > 0) {
+      this.currentPage--;
+      this.fetchProducts();
+    }
+  }
+
+  addToCart(productId: number) {
+    if (!this.userId) {
+      alert("Please log in to add items to cart.");
+      return;
+    }
+    
+    this.http.post(`/api/carts/user/${this.userId}/add?productId=${productId}&quantity=1`, {}).subscribe({
+      next: () => {
+        alert("Product added to cart successfully!");
+      },
+      error: (err) => {
+        alert("Failed to add product to cart.");
+      }
+    });
+  }
+
+  goToCart() {
+    this.router.navigate(['/cart']);
+  }
+
+  goToOrders() {
+    this.router.navigate(['/order-history']);
+  }
+
+  logout() {
+    this.authService.logout();
+  }
+}
+
+
+--- FILE: ./src/app/products/products.html ---
+<div class="flex flex-col h-full overflow-y-auto bg-slate-900/40">
+
+  <!-- Header -->
+  <header class="h-14 glass-panel border-b border-white/5 flex items-center justify-between px-6 shrink-0 sticky top-0 z-10">
+    <h1 class="text-base font-semibold text-white flex items-center gap-2">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/></svg>
+      Product Catalog
+    </h1>
+    <span class="text-sm text-slate-400">{{ totalElements }} products</span>
+  </header>
+
+  <!-- Filters bar -->
+  <div class="p-4 glass-panel border-b border-white/5 flex flex-wrap gap-3">
+    <input type="text" [(ngModel)]="searchQuery" (input)="applyFilters()"
+           class="glass-input px-3 py-2 rounded-lg text-sm flex-1 min-w-40" placeholder="Search products...">
+    <select [(ngModel)]="selectedCategoryId" (change)="applyFilters()"
+            class="glass-input px-3 py-2 rounded-lg text-sm">
+      <option value="">All Categories</option>
+      <option *ngFor="let cat of categories" [value]="cat.id">{{ cat.name }}</option>
+    </select>
+    <select [(ngModel)]="sortBy" (change)="applyFilters()"
+            class="glass-input px-3 py-2 rounded-lg text-sm">
+      <option value="newest">Newest</option>
+      <option value="price_asc">Price ↑</option>
+      <option value="price_desc">Price ↓</option>
+    </select>
+  </div>
+
+  <!-- Grid -->
+  <div class="p-6 flex-1">
+    <div *ngIf="products.length === 0" class="flex flex-col items-center justify-center h-full text-slate-500 py-20">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="mb-4 opacity-40"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <p>No products found.</p>
+      <button (click)="searchQuery=''; selectedCategoryId=''; sortBy='newest'; applyFilters()" class="mt-3 text-indigo-400 text-sm">Clear filters</button>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+      <div *ngFor="let product of products"
+           class="glass-card rounded-2xl overflow-hidden border border-white/5 flex flex-col group hover:border-indigo-500/30 transition-all duration-300 animate-fade-in shadow-lg">
+        <div class="h-40 bg-slate-800/50 relative overflow-hidden flex items-center justify-center group-hover:bg-slate-800/80 transition-colors">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          <div class="absolute top-3 right-3 bg-indigo-500 text-white text-xs font-bold px-2 py-1 rounded shadow-md">${{ product.price }}</div>
+        </div>
+        <div class="p-4 flex-1 flex flex-col">
+          <div class="text-xs text-indigo-400 font-medium mb-1">{{ getCategoryName(product.categoryId) }}</div>
+          <h3 class="text-base font-bold text-white mb-1 line-clamp-1">{{ product.name }}</h3>
+          <p class="text-xs text-slate-400 line-clamp-2 flex-1">{{ product.description }}</p>
+          <div class="mt-3 pt-3 border-t border-white/5 flex items-center justify-between">
+            <span class="text-xs text-slate-500">Stock: {{ product.stockQuantity }}</span>
+            <button (click)="addToCart(product.id)"
+                    class="bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              Add
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pagination Controls -->
+    <div class="mt-8 flex items-center justify-center gap-4" *ngIf="totalPages > 1">
+      <button (click)="prevPage()" [disabled]="currentPage === 0"
+              class="bg-slate-800/50 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-white/5">
+        Previous
+      </button>
+      <span class="text-sm text-slate-400">Page {{ currentPage + 1 }} of {{ totalPages }}</span>
+      <button (click)="nextPage()" [disabled]="currentPage >= totalPages - 1"
+              class="bg-slate-800/50 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-white/5">
+        Next
+      </button>
+    </div>
+  </div>
+</div>
+
+
+--- FILE: ./src/app/cart/cart.ts ---
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
+
+@Component({
+  selector: 'app-cart',
+  standalone: true,
+  imports: [CommonModule],
+  templateUrl: './cart.html'
+})
+export class CartComponent implements OnInit {
+  cart: any = null;
+  loading = true;
+  userId = 0;
+  removingId: number | null = null;
+
+  constructor(private http: HttpClient, private router: Router) {}
+
+  ngOnInit() {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try { this.userId = JSON.parse(userStr).id; } catch (e) {}
+    }
+    if (!this.userId) { this.router.navigate(['/login']); return; }
+    this.loadCart();
+  }
+
+  loadCart() {
+    this.loading = true;
+    this.http.get<any>(`/api/carts/user/${this.userId}`).subscribe({
+      next: (data) => { this.cart = data; this.loading = false; },
+      error: () => { this.cart = null; this.loading = false; }
+    });
+  }
+
+  removeItem(itemId: number) {
+    this.removingId = itemId;
+    this.http.delete(`/api/carts/user/${this.userId}/remove/${itemId}`).subscribe({
+      next: () => { this.removingId = null; this.loadCart(); },
+      error: () => { this.removingId = null; }
+    });
+  }
+
+  get totalPrice(): number {
+    if (!this.cart?.items) return 0;
+    return this.cart.items.reduce((sum: number, item: any) => sum + (item.product?.price || 0) * item.quantity, 0);
+  }
+
+  checkout() { this.router.navigate(['/checkout']); }
+}
+
+
+--- FILE: ./src/app/cart/cart.html ---
+<div class="flex flex-col h-full overflow-y-auto bg-slate-900/40">
+
+  <header class="h-14 glass-panel border-b border-white/5 flex items-center justify-between px-6 shrink-0 sticky top-0 z-10">
+    <h1 class="text-base font-semibold text-white flex items-center gap-2">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+      Shopping Cart
+    </h1>
+    <span class="text-sm text-slate-400">{{ cart?.items?.length || 0 }} items</span>
+  </header>
+
+  <div class="flex-1 p-6">
+
+    <div *ngIf="loading" class="flex flex-col items-center justify-center py-20 text-indigo-400">
+      <div class="w-10 h-10 rounded-full border-4 border-indigo-500/30 border-t-indigo-500 animate-spin mb-4"></div>
+      Loading cart...
+    </div>
+
+    <div *ngIf="!loading && (!cart?.items || cart.items.length === 0)" class="flex flex-col items-center justify-center py-20 text-slate-500">
+      <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="mb-4 opacity-30"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+      <p class="text-lg font-medium mb-2">Your cart is empty</p>
+      <p class="text-sm text-slate-600">Add some products to get started</p>
+    </div>
+
+    <div *ngIf="!loading && cart?.items?.length > 0" class="max-w-2xl mx-auto space-y-3">
+
+      <!-- Items -->
+      <div *ngFor="let item of cart.items" class="glass-card rounded-xl p-4 border border-white/5 flex items-center gap-4 animate-fade-in hover:border-indigo-500/20 transition-colors">
+        <div class="w-12 h-12 rounded-lg bg-slate-800/60 flex items-center justify-center border border-white/5 shrink-0">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="font-semibold text-white truncate">{{ item.product?.name || 'Product #' + item.product?.id }}</p>
+          <p class="text-xs text-slate-400">${{ item.product?.price?.toFixed(2) }} × {{ item.quantity }}</p>
+        </div>
+        <div class="text-right shrink-0">
+          <p class="font-bold text-white">${{ ((item.product?.price || 0) * item.quantity).toFixed(2) }}</p>
+        </div>
+        <button (click)="removeItem(item.id)" [disabled]="removingId === item.id"
+                class="ml-2 w-8 h-8 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 flex items-center justify-center transition-colors border border-red-500/10 shrink-0">
+          <div *ngIf="removingId === item.id" class="w-4 h-4 rounded-full border-2 border-red-500/30 border-t-red-500 animate-spin"></div>
+          <svg *ngIf="removingId !== item.id" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="m19 6-.867 12.142A2 2 0 0 1 16.138 20H7.862a2 2 0 0 1-1.995-1.858L5 6"/></svg>
+        </button>
+      </div>
+
+      <!-- Summary -->
+      <div class="glass-card rounded-xl p-5 border border-white/5 mt-2">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-slate-400 font-medium">Order Total</span>
+          <span class="text-2xl font-bold text-white">${{ totalPrice.toFixed(2) }}</span>
+        </div>
+        <button (click)="checkout()"
+                class="w-full py-3 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white font-bold transition-colors shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2">
+          Proceed to Checkout
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+--- FILE: ./src/app/checkout/checkout.ts ---
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
+import { FormsModule } from '@angular/forms'; // FormsModule eklendi
+
+@Component({
+  selector: 'app-checkout',
+  standalone: true,
+  imports: [CommonModule, FormsModule], // FormsModule eklendi
+  template: `
+    <div class="flex h-screen overflow-hidden w-full bg-slate-900/40 items-center justify-center">
+      <div class="w-full max-w-md glass-card rounded-2xl p-8 border border-white/5 shadow-2xl animate-fade-in relative overflow-y-auto max-h-[90vh]">
+        <!-- Header (Aynı kalıyor) -->
+        <div class="text-center mb-8">
+          <h2 class="text-2xl font-bold text-white tracking-tight">Checkout</h2>
+        </div>
+
+        <div *ngIf="loading" class="text-center text-indigo-400 py-8 flex flex-col items-center">
+           <div class="w-8 h-8 rounded-full border-4 border-indigo-500/30 border-t-indigo-500 animate-spin mb-4"></div>
+           Processing Order...
+        </div>
+
+        <div *ngIf="!loading && !orderSuccess">
+          
+          <div class="mb-4">
+            <label class="block text-xs text-slate-400 uppercase tracking-wider mb-2 font-semibold">Shipping Address</label>
+            <textarea [(ngModel)]="shippingAddress" rows="2" class="w-full glass-input px-4 py-3 rounded-xl text-white" placeholder="123 Main St, City"></textarea>
+          </div>
+
+          <div class="mb-4">
+            <label class="block text-xs text-slate-400 uppercase tracking-wider mb-2 font-semibold">Billing Address</label>
+            <textarea [(ngModel)]="billingAddress" rows="2" class="w-full glass-input px-4 py-3 rounded-xl text-white" placeholder="Same as shipping?"></textarea>
+          </div>
+
+          <div class="mb-6">
+            <label class="block text-xs text-slate-400 uppercase tracking-wider mb-2 font-semibold">Payment Method</label>
+            <select [(ngModel)]="paymentMethod" class="w-full glass-input px-4 py-3 rounded-xl text-white">
+              <option value="CREDIT_CARD" class="text-black">Credit Card</option>
+              <option value="PAYPAL" class="text-black">PayPal</option>
+            </select>
+          </div>
+          
+          <button (click)="placeOrder()" class="w-full py-4 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white font-bold transition-all flex items-center justify-center">
+            Confirm & Pay
+          </button>
+        </div>
+
+        <div *ngIf="orderSuccess" class="text-center py-8">
+          <h3 class="text-xl font-bold text-white mb-2">Order Confirmed!</h3>
+          <button (click)="goToOrders()" class="w-full py-3 rounded-xl bg-slate-800 text-white transition-colors border border-white/5">
+            View My Orders
+          </button>
+        </div>
+      </div>
+    </div>
+  `
+})
+export class Checkout implements OnInit {
+  userId: number = 0;
+  loading: boolean = false;
+  orderSuccess: boolean = false;
+  
+  shippingAddress: string = '';
+  billingAddress: string = '';
+  paymentMethod: string = 'CREDIT_CARD';
+
+  constructor(private http: HttpClient, private router: Router) {}
+
+  ngOnInit() {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try { this.userId = JSON.parse(userStr).id; } catch (e) {}
+    }
+    if (!this.userId) this.router.navigate(['/login']);
+  }
+
+  goToOrders() { this.router.navigate(['/order-history']); }
+
+  placeOrder() {
+    if (!this.shippingAddress || !this.billingAddress) {
+      alert("Addresses are required!");
+      return;
+    }
+
+    this.loading = true;
+    this.http.get<any>(`/api/carts/user/${this.userId}`).subscribe({
+      next: (cart) => {
+        const orderItems = cart.items.map((ci: any) => ({
+          productId: ci.product.id, quantity: ci.quantity
+        }));
+
+        const orderReq = {
+          userId: this.userId,
+          paymentMethod: this.paymentMethod,
+          shippingAddress: this.shippingAddress,
+          billingAddress: this.billingAddress,
+          items: orderItems
+        };
+
+        this.http.post('/api/orders', orderReq).subscribe({
+          next: () => {
+            this.http.delete(`/api/carts/user/${this.userId}/clear`).subscribe({
+              next: () => { this.loading = false; this.orderSuccess = true; },
+              error: () => { this.loading = false; this.orderSuccess = true; }
+            });
+          },
+          error: (err) => {
+            alert('Failed to place order.');
+            this.loading = false;
+          }
+        });
+      }
+    });
+  }
+}
+
+--- FILE: ./src/app/admin-dashboard/admin-dashboard.ts ---
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
+import { AuthService } from '../services/auth';
+
+@Component({
+  selector: 'app-admin-dashboard',
+  standalone: true,
+  imports: [CommonModule],
+  templateUrl: './admin-dashboard.html'
+})
+export class AdminDashboard implements OnInit {
+  stats: any = null;
+  loading = true;
+  error: string | null = null;
+
+  constructor(
+    private http: HttpClient,
+    private router: Router,
+    private authService: AuthService
+  ) {}
+
+  ngOnInit() {
+    this.http.get('/api/dashboard/stats').subscribe({
+      next: (data) => { this.stats = data; this.loading = false; },
+      error: (err) => {
+        this.error = 'Failed to load dashboard stats.';
+        this.loading = false;
+        console.error(err);
+      }
+    });
+  }
+
+  goToProducts() { this.router.navigate(['/admin/products']); }
+  goToOrders() { this.router.navigate(['/admin/orders']); }
+  goToUsers() { this.router.navigate(['/admin/users']); }
+  goToStores() { this.router.navigate(['/admin/stores']); }
+  goToChat() { this.router.navigate(['/chat']); }
+  logout() { this.authService.logout(); }
+}
+
+
+
+--- FILE: ./src/app/admin-dashboard/admin-dashboard.html ---
+<div class="flex flex-col h-full overflow-y-auto bg-slate-900/40">
+
+  <header class="h-14 glass-panel border-b border-white/5 flex items-center justify-between px-6 shrink-0 sticky top-0 z-10">
+    <h1 class="text-base font-semibold text-white flex items-center gap-2">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+      Store Dashboard
+    </h1>
+    <span class="text-sm text-slate-400">Your store overview</span>
+  </header>
+
+  <div *ngIf="loading" class="flex-1 flex items-center justify-center">
+    <div class="flex flex-col items-center gap-4">
+      <div class="w-12 h-12 rounded-full border-4 border-indigo-500/30 border-t-indigo-500 animate-spin"></div>
+      <p class="text-slate-400 text-sm">Loading dashboard...</p>
+    </div>
+  </div>
+
+  <div *ngIf="error" class="flex-1 flex items-center justify-center">
+    <div class="text-center p-8">
+      <div class="text-4xl mb-4">⚠️</div>
+      <p class="text-red-400 font-medium">{{ error }}</p>
+    </div>
+  </div>
+
+  <div *ngIf="stats && !loading" class="p-6 md:p-8 space-y-6">
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+
+      <div class="glass-card rounded-2xl p-5 border border-white/5 flex flex-col gap-2 hover:border-indigo-500/30 transition-all group">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Products</span>
+          <div class="w-8 h-8 rounded-lg bg-indigo-500/15 flex items-center justify-center group-hover:bg-indigo-500/25 transition-colors">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/></svg>
+          </div>
+        </div>
+        <p class="text-3xl font-bold text-white">{{ stats.totalProducts | number }}</p>
+        <p class="text-xs text-slate-500">Total platform SKUs</p>
+      </div>
+
+      <div class="glass-card rounded-2xl p-5 border border-white/5 flex flex-col gap-2 hover:border-purple-500/30 transition-all group">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Reviews</span>
+          <div class="w-8 h-8 rounded-lg bg-purple-500/15 flex items-center justify-center group-hover:bg-purple-500/25 transition-colors">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </div>
+        </div>
+        <p class="text-3xl font-bold text-white">{{ stats.totalReviews | number }}</p>
+        <p class="text-xs text-slate-500">Customer review records</p>
+      </div>
+
+      <div class="glass-card rounded-2xl p-5 border border-white/5 flex flex-col gap-2 hover:border-cyan-500/30 transition-all group">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Users</span>
+          <div class="w-8 h-8 rounded-lg bg-cyan-500/15 flex items-center justify-center group-hover:bg-cyan-500/25 transition-colors">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+          </div>
+        </div>
+        <p class="text-3xl font-bold text-white">{{ stats.totalUsers | number }}</p>
+        <p class="text-xs text-slate-500">Registered platform users</p>
+      </div>
+
+      <div class="glass-card rounded-2xl p-5 border border-white/5 flex flex-col gap-2 hover:border-yellow-500/30 transition-all group">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Avg. Rating</span>
+          <div class="w-8 h-8 rounded-lg bg-yellow-500/15 flex items-center justify-center group-hover:bg-yellow-500/25 transition-colors">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#eab308" stroke="#eab308" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </div>
+        </div>
+        <p class="text-3xl font-bold text-white">{{ stats.averageRating }}</p>
+        <p class="text-xs text-slate-500">Average across all reviews</p>
+      </div>
+
+    </div>
+
+    <!-- Low Stock Alerts -->
+    <div *ngIf="stats.lowStockAlerts && stats.lowStockAlerts.length > 0" class="glass-card rounded-2xl p-5 border border-yellow-500/20 bg-yellow-500/5">
+      <div class="flex items-center gap-2 mb-4">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+        <h3 class="text-sm font-semibold text-yellow-400">Low Stock Alerts ({{ stats.lowStockAlerts.length }})</h3>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div *ngFor="let alert of stats.lowStockAlerts" class="flex items-center gap-3 bg-yellow-500/10 rounded-xl p-3 border border-yellow-500/20">
+          <div class="w-8 h-8 rounded-lg bg-yellow-500/20 flex items-center justify-center shrink-0">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2"><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+          </div>
+          <div>
+            <p class="text-sm font-medium text-white">{{ alert.name }}</p>
+            <p class="text-xs text-yellow-500">Only {{ alert.stock_quantity }} left</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick actions -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <button (click)="goToOrders()" class="glass-card rounded-2xl p-5 border border-white/5 hover:border-indigo-500/30 transition-all text-left group">
+        <div class="flex items-center gap-4">
+          <div class="w-11 h-11 rounded-xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20 group-hover:bg-indigo-500/20 transition-colors">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/></svg>
+          </div>
+          <div>
+            <h3 class="font-semibold text-white">Manage Orders</h3>
+            <p class="text-sm text-slate-400">View and process incoming orders</p>
+          </div>
+        </div>
+      </button>
+      <button (click)="goToProducts()" class="glass-card rounded-2xl p-5 border border-white/5 hover:border-purple-500/30 transition-all text-left group">
+        <div class="flex items-center gap-4">
+          <div class="w-11 h-11 rounded-xl bg-purple-500/10 flex items-center justify-center border border-purple-500/20 group-hover:bg-purple-500/20 transition-colors">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/></svg>
+          </div>
+          <div>
+            <h3 class="font-semibold text-white">Manage Products</h3>
+            <p class="text-sm text-slate-400">Add, edit, and remove listings</p>
+          </div>
+        </div>
+      </button>
+    </div>
+
+  </div>
+</div>
+
+
+--- FILE: ./src/app/admin-products/admin-products.ts ---
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
+
+@Component({
+  selector: 'app-admin-products',
+  standalone: true,
+  imports: [CommonModule, FormsModule],
+  templateUrl: './admin-products.html'
+})
+export class AdminProducts implements OnInit {
+  products: any[] = [];
+  showAddModal = false;
+  newProduct: any = {
+    sku: '', name: '', description: '', price: 0, stockQuantity: 0, storeId: null
+  };
+  
+  userRole = '';
+  userId = 0;
+
+  constructor(private http: HttpClient) {}
+
+  ngOnInit() {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        this.userRole = user.role;
+        this.userId = user.id;
+      } catch (e) {}
+    }
+    this.loadProducts();
+  }
+
+  loadProducts() {
+    if (this.userRole === 'CORPORATE') {
+      this.http.get<any[]>(`/api/products/corporate/${this.userId}`).subscribe({
+        next: (data) => this.products = data,
+        error: (err) => console.error(err)
+      });
+    } else {
+      this.http.get<any[]>('/api/products').subscribe({
+        next: (data) => this.products = data,
+        error: (err) => console.error(err)
+      });
+    }
+  }
+
+  openAddModal() {
+    this.showAddModal = true;
+    this.newProduct = { sku: '', name: '', description: '', price: 0, stockQuantity: 0, storeId: null };
+    
+    // If corporate user, we need to fetch their store ID or backend should handle it.
+    // For now, if we don't have storeId, we can set a dummy or rely on backend to assign it?
+    // Wait, let's fetch their store ID first if they are corporate.
+    if (this.userRole === 'CORPORATE') {
+      this.http.get<any[]>(`/api/stores/corporate/${this.userId}`).subscribe({
+        next: (stores) => {
+          if (stores && stores.length > 0) {
+            this.newProduct.storeId = stores[0].id;
+          }
+        }
+      });
+    }
+  }
+
+  closeAddModal() {
+    this.showAddModal = false;
+  }
+
+  onSubmit() {
+    this.http.post('/api/products', this.newProduct).subscribe({
+      next: () => {
+        this.loadProducts();
+        this.closeAddModal();
+      },
+      error: (err) => alert('Failed to create product')
+    });
+  }
+
+  deleteProduct(id: number) {
+    if (confirm('Are you sure you want to delete this product?')) {
+      this.http.delete(`/api/products/${id}`).subscribe({
+        next: () => this.loadProducts(),
+        error: (err) => alert('Failed to delete product')
+      });
+    }
+  }
+}
+
+
+--- FILE: ./src/app/admin-products/admin-products.html ---
+<div class="flex flex-col h-full overflow-y-auto bg-slate-900/40">
+
+  <!-- Header -->
+  <header class="h-14 glass-panel border-b border-white/5 flex items-center justify-between px-6 shrink-0 sticky top-0 z-10">
+    <h1 class="text-base font-semibold text-white flex items-center gap-2">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+      Manage Products
+    </h1>
+    <button (click)="openAddModal()" class="bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+      Add Product
+    </button>
+  </header>
+
+  <!-- Content -->
+  <div class="p-6">
+    <div class="glass-card rounded-2xl border border-white/5 overflow-hidden animate-fade-in">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-white/5 border-b border-white/5">
+              <th class="p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">SKU</th>
+              <th class="p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Name</th>
+              <th class="p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Price</th>
+              <th class="p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Stock</th>
+              <th class="p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Store ID</th>
+              <th class="p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-white/5">
+            <tr *ngFor="let product of products" class="hover:bg-white/[0.02] transition-colors">
+              <td class="p-4 text-sm text-slate-400 font-mono">{{ product.sku }}</td>
+              <td class="p-4 text-sm font-medium text-white">{{ product.name }}</td>
+              <td class="p-4 text-sm text-indigo-400 font-bold">${{ product.price }}</td>
+              <td class="p-4 text-sm">
+                <span class="px-2 py-1 rounded text-xs font-medium border"
+                      [ngClass]="product.stockQuantity < 10 ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-green-500/10 text-green-400 border-green-500/20'">
+                  {{ product.stockQuantity }}
+                </span>
+              </td>
+              <td class="p-4 text-sm text-slate-400">{{ product.storeId || 'None' }}</td>
+              <td class="p-4 text-sm text-right">
+                <button (click)="deleteProduct(product.id)" class="text-red-400 hover:text-red-300 p-1.5 rounded-lg hover:bg-red-500/10 transition-colors">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
+              </td>
+            </tr>
+            <tr *ngIf="products.length === 0">
+              <td colspan="6" class="p-8 text-center text-slate-500">No products found.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Product Modal -->
+  <div *ngIf="showAddModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+    <div class="glass-card w-full max-w-md rounded-2xl p-6 border border-white/10 shadow-2xl">
+      <div class="flex items-center justify-between mb-6">
+        <h3 class="text-lg font-bold text-white">Add New Product</h3>
+        <button (click)="closeAddModal()" class="text-slate-400 hover:text-white transition-colors">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      
+      <form (ngSubmit)="onSubmit()" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">SKU</label>
+          <input type="text" [(ngModel)]="newProduct.sku" name="sku" required class="w-full glass-input px-3 py-2 rounded-xl text-white text-sm" placeholder="e.g. PRD-1234">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">Name</label>
+          <input type="text" [(ngModel)]="newProduct.name" name="name" required class="w-full glass-input px-3 py-2 rounded-xl text-white text-sm" placeholder="Product name">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">Description</label>
+          <textarea [(ngModel)]="newProduct.description" name="description" rows="2" class="w-full glass-input px-3 py-2 rounded-xl text-white text-sm resize-none"></textarea>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">Price ($)</label>
+            <input type="number" [(ngModel)]="newProduct.price" name="price" required class="w-full glass-input px-3 py-2 rounded-xl text-white text-sm">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">Initial Stock</label>
+            <input type="number" [(ngModel)]="newProduct.stockQuantity" name="stockQuantity" required class="w-full glass-input px-3 py-2 rounded-xl text-white text-sm">
+          </div>
+        </div>
+        <!-- Only Admin should freely pick Store ID, Corporate should automatically get their store ID -->
+        <div *ngIf="userRole === 'ADMIN'">
+          <label class="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">Store ID</label>
+          <input type="number" [(ngModel)]="newProduct.storeId" name="storeId" required class="w-full glass-input px-3 py-2 rounded-xl text-white text-sm" placeholder="Enter Store ID">
+        </div>
+        
+        <button type="submit" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 rounded-xl transition-colors mt-2 shadow-lg shadow-indigo-500/20">
+          Create Product
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+
+--- FILE: ./src/app/order-history/order-history.ts ---
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
+import { AuthService } from '../services/auth';
+
+import { FormsModule } from '@angular/forms';
+
+@Component({
+  selector: 'app-order-history',
+  standalone: true,
+  imports: [CommonModule, FormsModule],
+  templateUrl: './order-history.html'
+})
+export class OrderHistory implements OnInit {
+  orders: any[] = [];
+  userId: number = 0;
+  loading: boolean = true;
+  showReviewModal: boolean = false;
+  reviewingProductId: number | null = null;
+  reviewRating: number = 5;
+  reviewComment: string = '';
+  submittingReview: boolean = false;
+
+  constructor(
+    private http: HttpClient,
+    private router: Router,
+    private authService: AuthService
+  ) {}
+
+  ngOnInit() {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        this.userId = user.id;
+      } catch (e) {}
+    }
+
+    if (!this.userId) {
+      this.router.navigate(['/login']);
+      return;
+    }
+
+    this.fetchOrders();
+  }
+
+  fetchOrders() {
+    this.http.get<any[]>(`/api/orders/user/${this.userId}`).subscribe({
+      next: (data) => {
+        // Sort orders by newest first
+        this.orders = data.sort((a, b) => b.id - a.id);
+        this.loading = false;
+      },
+      error: (err) => {
+        console.error('Failed to fetch orders', err);
+        this.loading = false;
+      }
+    });
+  }
+
+  openReviewModal(productId: number) {
+    this.reviewingProductId = productId;
+    this.reviewRating = 5;
+    this.reviewComment = '';
+    this.showReviewModal = true;
+  }
+
+  closeReviewModal() {
+    this.showReviewModal = false;
+    this.reviewingProductId = null;
+  }
+
+  submitReview() {
+    if (!this.reviewingProductId || !this.reviewComment.trim()) {
+      alert("Please enter a comment");
+      return;
+    }
+    this.submittingReview = true;
+    const req = {
+      productId: this.reviewingProductId,
+      userId: this.userId,
+      rating: this.reviewRating,
+      comment: this.reviewComment
+    };
+
+    this.http.post('/api/reviews', req).subscribe({
+      next: () => {
+        alert("Review submitted successfully!");
+        this.submittingReview = false;
+        this.closeReviewModal();
+      },
+      error: (err) => {
+        console.error("Failed to submit review", err);
+        alert("Failed to submit review. You may have already reviewed this product.");
+        this.submittingReview = false;
+      }
+    });
+  }
+
+  goBack() {
+    this.router.navigate(['/products']);
+  }
+
+  logout() {
+    this.authService.logout();
+  }
+}
+
+
+--- FILE: ./src/app/order-history/order-history.html ---
+<div class="flex flex-col h-full overflow-y-auto bg-slate-900/40">
+
+  <!-- Header -->
+  <header class="h-14 glass-panel border-b border-white/5 flex items-center justify-between px-6 shrink-0 sticky top-0 z-10">
+    <h1 class="text-base font-semibold text-white flex items-center gap-2">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+      Purchase History
+    </h1>
+    <span class="text-sm text-slate-400">{{ orders.length }} orders</span>
+  </header>
+
+  <div class="p-6 flex-1">
+    <div *ngIf="loading" class="flex flex-col items-center justify-center py-20 text-indigo-400">
+      <div class="w-10 h-10 rounded-full border-4 border-indigo-500/30 border-t-indigo-500 animate-spin mb-4"></div>
+      Loading orders...
+    </div>
+
+    <div *ngIf="!loading && orders.length === 0" class="flex flex-col items-center justify-center py-20 text-slate-500">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="mb-4 opacity-40"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+      <p class="mb-2">No orders yet.</p>
+    </div>
+
+    <div *ngIf="!loading && orders.length > 0" class="space-y-3">
+      <div *ngFor="let order of orders" class="glass-card rounded-xl border border-white/5 p-5 hover:border-indigo-500/20 transition-colors animate-fade-in">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex items-center gap-4">
+            <div class="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
+            </div>
+            <div>
+              <div class="text-xs text-slate-500 uppercase tracking-wider font-semibold">Order #{{ order.id }}</div>
+              <div class="text-sm font-semibold text-white">{{ order.orderDate | date:'dd MMM yyyy, HH:mm' }}</div>
+              <div class="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+                {{ order.paymentMethod }}
+              </div>
+            </div>
+          </div>
+          <span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border self-start sm:self-auto"
+                [ngClass]="{
+                  'bg-yellow-500/10 text-yellow-400 border-yellow-500/20': order.status === 'PENDING',
+                  'bg-indigo-500/10 text-indigo-400 border-indigo-500/20': order.status === 'PROCESSING',
+                  'bg-blue-500/10 text-blue-400 border-blue-500/20': order.status === 'SHIPPED',
+                  'bg-green-500/10 text-green-400 border-green-500/20': order.status === 'DELIVERED',
+                  'bg-red-500/10 text-red-400 border-red-500/20': order.status === 'CANCELLED'
+                }">
+            {{ order.status }}
+          </span>
+        </div>
+        
+        <!-- Order Items -->
+        <div class="mt-4 pt-4 border-t border-white/5 space-y-2">
+          <div *ngFor="let item of order.items" class="flex items-center justify-between text-sm">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 bg-slate-800 rounded flex items-center justify-center">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              </div>
+              <div>
+                <div class="text-slate-300 font-medium">{{ item.productName || 'Product #' + item.productId }}</div>
+                <div class="text-slate-500 text-xs">{{ item.quantity }} x ${{ item.unitPrice }}</div>
+              </div>
+            </div>
+            
+            <button *ngIf="order.status === 'DELIVERED'" (click)="openReviewModal(item.productId)"
+                    class="text-xs text-indigo-400 hover:text-indigo-300 border border-indigo-500/30 hover:border-indigo-400/50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+              Review
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Review Modal -->
+  <div *ngIf="showReviewModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+    <div class="glass-card w-full max-w-md rounded-2xl p-6 border border-white/10 shadow-2xl">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-bold text-white">Write a Review</h3>
+        <button (click)="closeReviewModal()" class="text-slate-400 hover:text-white transition-colors">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">Rating</label>
+          <select [(ngModel)]="reviewRating" class="w-full glass-input px-3 py-2.5 rounded-xl text-white text-sm appearance-none cursor-pointer">
+            <option [ngValue]="5">5 - Excellent</option>
+            <option [ngValue]="4">4 - Good</option>
+            <option [ngValue]="3">3 - Average</option>
+            <option [ngValue]="2">2 - Poor</option>
+            <option [ngValue]="1">1 - Terrible</option>
+          </select>
+        </div>
+        
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">Comment</label>
+          <textarea [(ngModel)]="reviewComment" rows="4" class="w-full glass-input px-3 py-2.5 rounded-xl text-white text-sm resize-none" placeholder="Share your experience with this product..."></textarea>
+        </div>
+        
+        <button (click)="submitReview()" [disabled]="submittingReview"
+                class="w-full bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition-colors shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2">
+          <div *ngIf="submittingReview" class="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin"></div>
+          <span *ngIf="!submittingReview">Submit Review</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+--- FILE: ./src/app/admin-orders/admin-orders.ts ---
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
+import { AuthService } from '../services/auth';
+
+@Component({
+  selector: 'app-admin-orders',
+  standalone: true,
+  imports: [CommonModule],
+  templateUrl: './admin-orders.html'
+})
+export class AdminOrders implements OnInit {
+  orders: any[] = [];
+  loading = true;
+  userId: number = 0;
+  userRole: string = '';
+  
+  // Status update state
+  updatingOrderId: number | null = null;
+
+  readonly statusFlow = ['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED'];
+
+  constructor(
+    private http: HttpClient,
+    private router: Router,
+    private authService: AuthService
+  ) {}
+
+  ngOnInit() {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        this.userId = user.id;
+        this.userRole = user.role;
+      } catch (e) {}
+    }
+
+    if (!this.userId) {
+      this.router.navigate(['/login']);
+      return;
+    }
+
+    this.fetchOrders();
+  }
+
+  fetchOrders() {
+    this.loading = true;
+    let endpoint = '';
+
+    if (this.userRole === 'ADMIN') {
+      endpoint = '/api/orders';
+    } else {
+      // CORPORATE: fetch only orders that contain their store's products
+      endpoint = `/api/orders/corporate/${this.userId}`;
+    }
+
+    this.http.get<any[]>(endpoint).subscribe({
+      next: (data) => {
+        this.orders = data.sort((a, b) => b.id - a.id);
+        this.loading = false;
+      },
+      error: (err) => {
+        console.error('Failed to load orders', err);
+        this.loading = false;
+      }
+    });
+  }
+
+  advanceStatus(order: any) {
+    const currentIdx = this.statusFlow.indexOf(order.status);
+    if (currentIdx === -1 || currentIdx >= this.statusFlow.length - 1) return;
+
+    const nextStatus = this.statusFlow[currentIdx + 1];
+    this.updatingOrderId = order.id;
+
+    this.http.patch(`/api/orders/${order.id}/status?status=${nextStatus}`, {}).subscribe({
+      next: (updated: any) => {
+        const idx = this.orders.findIndex(o => o.id === order.id);
+        if (idx !== -1) this.orders[idx].status = updated.status;
+        this.updatingOrderId = null;
+      },
+      error: (err) => {
+        alert('Failed to update order status.');
+        this.updatingOrderId = null;
+      }
+    });
+  }
+
+  cancelOrder(order: any) {
+    this.updatingOrderId = order.id;
+    this.http.patch(`/api/orders/${order.id}/status?status=CANCELLED`, {}).subscribe({
+      next: (updated: any) => {
+        const idx = this.orders.findIndex(o => o.id === order.id);
+        if (idx !== -1) this.orders[idx].status = updated.status;
+        this.updatingOrderId = null;
+      },
+      error: () => {
+        alert('Failed to cancel order.');
+        this.updatingOrderId = null;
+      }
+    });
+  }
+
+  canAdvance(status: string): boolean {
+    const idx = this.statusFlow.indexOf(status);
+    return idx !== -1 && idx < this.statusFlow.length - 1;
+  }
+
+  goBack() {
+    this.router.navigate(['/admin/dashboard']);
+  }
+
+  logout() {
+    this.authService.logout();
+  }
+}
+
+
+--- FILE: ./src/app/admin-orders/admin-orders.html ---
+<div class="flex flex-col h-full overflow-y-auto bg-slate-900/40">
+
+  <header class="h-14 glass-panel border-b border-white/5 flex items-center justify-between px-6 shrink-0 sticky top-0 z-10">
+    <h1 class="text-base font-semibold text-white flex items-center gap-2">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect></svg>
+      Order Management
+    </h1>
+    <span class="text-sm text-slate-400">{{ orders.length }} total orders</span>
+  </header>
+
+  <div class="p-6 flex-1">
+    <div *ngIf="loading" class="flex flex-col items-center justify-center py-20 text-indigo-400">
+      <div class="w-10 h-10 rounded-full border-4 border-indigo-500/30 border-t-indigo-500 animate-spin mb-4"></div>
+      Loading orders...
+    </div>
+
+    <div *ngIf="!loading && orders.length === 0" class="flex flex-col items-center justify-center py-20 text-slate-500">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" class="mb-4 opacity-40"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect></svg>
+      <p>No orders to display yet.</p>
+    </div>
+
+    <div *ngIf="!loading && orders.length > 0" class="glass-card rounded-2xl border border-white/5 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm text-left">
+          <thead>
+            <tr class="border-b border-white/5 bg-slate-800/30">
+              <th class="px-5 py-4 text-xs text-slate-400 uppercase tracking-wider font-semibold">Order #</th>
+              <th class="px-5 py-4 text-xs text-slate-400 uppercase tracking-wider font-semibold">Customer</th>
+              <th class="px-5 py-4 text-xs text-slate-400 uppercase tracking-wider font-semibold">Date</th>
+              <th class="px-5 py-4 text-xs text-slate-400 uppercase tracking-wider font-semibold">Payment</th>
+              <th class="px-5 py-4 text-xs text-slate-400 uppercase tracking-wider font-semibold">Status</th>
+              <th class="px-5 py-4 text-xs text-slate-400 uppercase tracking-wider font-semibold">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-white/5">
+            <tr *ngFor="let order of orders" class="hover:bg-white/[0.02] transition-colors animate-fade-in">
+              <td class="px-5 py-4 font-bold text-white">#{{ order.id }}</td>
+              <td class="px-5 py-4">
+                <div class="flex items-center gap-2">
+                  <div class="w-7 h-7 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-xs font-bold">{{ (order.username || '?')[0] | uppercase }}</div>
+                  <span class="text-slate-200">{{ order.username || 'User #' + order.userId }}</span>
+                </div>
+              </td>
+              <td class="px-5 py-4 text-slate-400">{{ order.orderDate | date:'dd MMM yyyy' }}</td>
+              <td class="px-5 py-4 text-slate-300">{{ order.paymentMethod }}</td>
+              <td class="px-5 py-4">
+                <span class="px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wider border"
+                      [ngClass]="{
+                        'bg-yellow-500/10 text-yellow-400 border-yellow-500/20': order.status === 'PENDING',
+                        'bg-indigo-500/10 text-indigo-400 border-indigo-500/20': order.status === 'PROCESSING',
+                        'bg-blue-500/10 text-blue-400 border-blue-500/20': order.status === 'SHIPPED',
+                        'bg-green-500/10 text-green-400 border-green-500/20': order.status === 'DELIVERED',
+                        'bg-red-500/10 text-red-400 border-red-500/20': order.status === 'CANCELLED'
+                      }">
+                  {{ order.status }}
+                </span>
+              </td>
+              <td class="px-5 py-4">
+                <div class="flex gap-2" *ngIf="updatingOrderId !== order.id">
+                  <button *ngIf="canAdvance(order.status)" (click)="advanceStatus(order)"
+                          class="px-2.5 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/40 text-indigo-300 text-xs font-medium transition-colors border border-indigo-500/20 flex items-center gap-1">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                    Advance
+                  </button>
+                  <button *ngIf="order.status !== 'DELIVERED' && order.status !== 'CANCELLED'" (click)="cancelOrder(order)"
+                          class="px-2.5 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-medium transition-colors border border-red-500/20">
+                    Cancel
+                  </button>
+                  <span *ngIf="order.status === 'DELIVERED' || order.status === 'CANCELLED'" class="text-xs text-slate-500 italic">{{ order.status === 'DELIVERED' ? 'Completed' : 'Cancelled' }}</span>
+                </div>
+                <div *ngIf="updatingOrderId === order.id" class="w-5 h-5 rounded-full border-2 border-indigo-500/30 border-t-indigo-500 animate-spin"></div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+--- FILE: ./src/app/admin-users/admin-users.ts ---
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
+import { AuthService } from '../services/auth';
+
+@Component({
+  selector: 'app-admin-users',
+  standalone: true,
+  imports: [CommonModule],
+  templateUrl: './admin-users.html'
+})
+export class AdminUsers implements OnInit {
+  users: any[] = [];
+  loading = true;
+  deletingId: number | null = null;
+
+  readonly roleColors: Record<string, string> = {
+    ADMIN: 'bg-red-500/10 text-red-400 border-red-500/20',
+    CORPORATE: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+    INDIVIDUAL: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
+  };
+
+  constructor(
+    private http: HttpClient,
+    private router: Router,
+    private authService: AuthService
+  ) {}
+
+  ngOnInit() {
+    this.fetchUsers();
+  }
+
+  fetchUsers() {
+    this.http.get<any[]>('/api/users').subscribe({
+      next: (data) => { this.users = data; this.loading = false; },
+      error: (err) => { console.error(err); this.loading = false; }
+    });
+  }
+
+  deleteUser(user: any) {
+    if (!confirm(`Are you sure you want to delete "${user.username}"? This cannot be undone.`)) return;
+    this.deletingId = user.id;
+    this.http.delete(`/api/users/${user.id}`).subscribe({
+      next: () => {
+        this.users = this.users.filter(u => u.id !== user.id);
+        this.deletingId = null;
+      },
+      error: (err) => {
+        alert('Failed to delete user. They may have associated orders or data.');
+        this.deletingId = null;
+      }
+    });
+  }
+
+  getRoleClass(role: string): string {
+    return this.roleColors[role] || 'bg-slate-500/10 text-slate-400 border-slate-500/20';
+  }
+
+  goBack() { this.router.navigate(['/admin/dashboard']); }
+  logout() { this.authService.logout(); }
+}
+
+
+--- FILE: ./src/app/admin-users/admin-users.html ---
+<div class="flex flex-col h-full overflow-y-auto bg-slate-900/40">
+
+  <header class="h-14 glass-panel border-b border-white/5 flex items-center justify-between px-6 shrink-0 sticky top-0 z-10">
+    <h1 class="text-base font-semibold text-white flex items-center gap-2">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      User Management
+    </h1>
+    <span class="text-sm text-slate-400">{{ users.length }} registered users</span>
+  </header>
+
+  <div class="p-6 flex-1">
+    <div *ngIf="loading" class="flex flex-col items-center justify-center py-20 text-indigo-400">
+      <div class="w-10 h-10 rounded-full border-4 border-indigo-500/30 border-t-indigo-500 animate-spin mb-4"></div>
+      Loading users...
+    </div>
+
+    <div *ngIf="!loading" class="glass-card rounded-2xl border border-white/5 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm text-left">
+          <thead>
+            <tr class="border-b border-white/5 bg-slate-800/30">
+              <th class="px-5 py-4 text-xs text-slate-400 uppercase tracking-wider font-semibold">ID</th>
+              <th class="px-5 py-4 text-xs text-slate-400 uppercase tracking-wider font-semibold">User</th>
+              <th class="px-5 py-4 text-xs text-slate-400 uppercase tracking-wider font-semibold">Email</th>
+              <th class="px-5 py-4 text-xs text-slate-400 uppercase tracking-wider font-semibold">Role</th>
+              <th class="px-5 py-4 text-xs text-slate-400 uppercase tracking-wider font-semibold">Joined</th>
+              <th class="px-5 py-4 text-xs text-slate-400 uppercase tracking-wider font-semibold">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-white/5">
+            <tr *ngFor="let user of users" class="hover:bg-white/[0.02] transition-colors animate-fade-in">
+              <td class="px-5 py-4 text-slate-500 font-mono text-xs">#{{ user.id }}</td>
+              <td class="px-5 py-4">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-300 font-bold text-sm">{{ (user.username || '?')[0] | uppercase }}</div>
+                  <span class="font-medium text-white">{{ user.username }}</span>
+                </div>
+              </td>
+              <td class="px-5 py-4 text-slate-400">{{ user.email }}</td>
+              <td class="px-5 py-4">
+                <span class="px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wider border" [class]="getRoleClass(user.role)">{{ user.role }}</span>
+              </td>
+              <td class="px-5 py-4 text-slate-500 text-xs">{{ user.createdAt | date:'dd MMM yyyy' }}</td>
+              <td class="px-5 py-4">
+                <button *ngIf="deletingId !== user.id" (click)="deleteUser(user)"
+                        class="px-2.5 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-medium transition-colors border border-red-500/20 flex items-center gap-1">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="m19 6-.867 12.142A2 2 0 0 1 16.138 20H7.862a2 2 0 0 1-1.995-1.858L5 6m5 0V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2"/></svg>
+                  Delete
+                </button>
+                <div *ngIf="deletingId === user.id" class="w-5 h-5 rounded-full border-2 border-red-500/30 border-t-red-500 animate-spin"></div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+--- FILE: ./src/app/admin-stores/admin-stores.ts ---
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
+import { AuthService } from '../services/auth';
+
+@Component({
+  selector: 'app-admin-stores',
+  standalone: true,
+  imports: [CommonModule],
+  templateUrl: './admin-stores.html'
+})
+export class AdminStores implements OnInit {
+  stores: any[] = [];
+  loading = true;
+  togglingId: number | null = null;
+
+  constructor(
+    private http: HttpClient,
+    private router: Router,
+    private authService: AuthService
+  ) {}
+
+  ngOnInit() {
+    this.fetchStores();
+  }
+
+  fetchStores() {
+    this.http.get<any[]>('/api/stores').subscribe({
+      next: (data) => { this.stores = data; this.loading = false; },
+      error: (err) => { console.error(err); this.loading = false; }
+    });
+  }
+
+  toggleStore(store: any) {
+    this.togglingId = store.id;
+    this.http.patch(`/api/stores/${store.id}/toggle`, {}).subscribe({
+      next: (updated: any) => {
+        const idx = this.stores.findIndex(s => s.id === store.id);
+        if (idx !== -1) this.stores[idx].isOpen = updated.isOpen;
+        this.togglingId = null;
+      },
+      error: () => {
+        alert('Failed to toggle store status.');
+        this.togglingId = null;
+      }
+    });
+  }
+
+  goBack() { this.router.navigate(['/admin/dashboard']); }
+  logout() { this.authService.logout(); }
+}
+
+
+--- FILE: ./src/app/admin-stores/admin-stores.html ---
+<div class="flex flex-col h-full overflow-y-auto bg-slate-900/40">
+
+  <header class="h-14 glass-panel border-b border-white/5 flex items-center justify-between px-6 shrink-0 sticky top-0 z-10">
+    <h1 class="text-base font-semibold text-white flex items-center gap-2">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Store Management
+    </h1>
+    <span class="text-sm text-slate-400">{{ stores.length }} registered stores</span>
+  </header>
+
+  <div class="p-6 flex-1">
+    <div *ngIf="loading" class="flex flex-col items-center justify-center py-20 text-indigo-400">
+      <div class="w-10 h-10 rounded-full border-4 border-indigo-500/30 border-t-indigo-500 animate-spin mb-4"></div>
+      Loading stores...
+    </div>
+
+    <div *ngIf="!loading" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div *ngFor="let store of stores" class="glass-card rounded-2xl p-5 border flex flex-col gap-4 animate-fade-in transition-all"
+           [ngClass]="store.isOpen ? 'border-white/5 hover:border-green-500/20' : 'border-white/5 opacity-60'">
+        <div class="flex items-start justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center border"
+                 [ngClass]="store.isOpen ? 'bg-green-500/10 border-green-500/20' : 'bg-slate-700/50 border-white/5'">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" [attr.stroke]="store.isOpen ? '#4ade80' : '#64748b'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            </div>
+            <div>
+              <h3 class="font-bold text-white">{{ store.name }}</h3>
+              <p class="text-xs text-slate-500">ID #{{ store.id }} · Owner #{{ store.corporateUserId || 'N/A' }}</p>
+            </div>
+          </div>
+          <span class="px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wider border shrink-0"
+                [ngClass]="store.isOpen ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-slate-700/50 text-slate-500 border-white/5'">
+            {{ store.isOpen ? 'Open' : 'Closed' }}
+          </span>
+        </div>
+        <p class="text-sm text-slate-400 flex-1">{{ store.description || 'No description provided.' }}</p>
+        <button (click)="toggleStore(store)" [disabled]="togglingId === store.id"
+                class="w-full py-2 rounded-xl text-sm font-medium transition-all border flex items-center justify-center gap-2"
+                [ngClass]="store.isOpen ? 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/20' : 'bg-green-500/10 hover:bg-green-500/20 text-green-400 border-green-500/20'">
+          <div *ngIf="togglingId === store.id" class="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin"></div>
+          <span *ngIf="togglingId !== store.id">{{ store.isOpen ? '⛔ Close Store' : '✅ Open Store' }}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+--- FILE: ./src/app/shell/shell.ts ---
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { RouterOutlet, RouterModule, Router, NavigationEnd } from '@angular/router';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { AuthService } from '../services/auth';
+import { filter } from 'rxjs/operators';
+
+interface NavItem {
+  label: string;
+  route: string;
+  iconKey: string;
+}
+
+@Component({
+  selector: 'app-shell',
+  standalone: true,
+  imports: [CommonModule, RouterOutlet, RouterModule],
+  templateUrl: './shell.html'
+})
+export class Shell implements OnInit {
+  userRole = '';
+  username = '';
+  userId = 0;
+  currentRoute = '';
+  navItems: NavItem[] = [];
+
+  private readonly svgPaths: Record<string, string> = {
+    dashboard: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>`,
+    products:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>`,
+    cart:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>`,
+    orders:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>`,
+    history:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`,
+    chat:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
+    users:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+    stores:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
+  };
+
+  constructor(
+    private authService: AuthService,
+    private router: Router,
+    private sanitizer: DomSanitizer
+  ) {}
+
+  ngOnInit() {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        this.userRole = user.role;
+        this.username = user.username;
+        this.userId = user.id;
+      } catch (e) {}
+    }
+    this.buildNav();
+    this.router.events
+      .pipe(filter(e => e instanceof NavigationEnd))
+      .subscribe((e: any) => this.currentRoute = e.urlAfterRedirects);
+    this.currentRoute = this.router.url;
+  }
+
+  buildNav() {
+    switch (this.userRole) {
+      case 'ADMIN':
+        this.navItems = [
+          { label: 'Analytics Dashboard', route: '/dashboard',     iconKey: 'dashboard' },
+          { label: 'AI Data Explorer',    route: '/chat',          iconKey: 'chat'      },
+          { label: 'Order Management',    route: '/admin/orders',  iconKey: 'orders'    },
+          { label: 'Product Catalog',     route: '/admin/products',iconKey: 'products'  },
+          { label: 'User Management',     route: '/admin/users',   iconKey: 'users'     },
+          { label: 'Store Approval',      route: '/admin/stores',  iconKey: 'stores'    },
+          { label: 'System Audit Logs',   route: '/admin/audit',   iconKey: 'history'   },
+        ];
+        break;
+      case 'CORPORATE':
+        this.navItems = [
+          { label: 'Store Dashboard',   route: '/admin/dashboard', iconKey: 'dashboard' },
+          { label: 'AI Data Explorer',  route: '/chat',            iconKey: 'chat'      },
+          { label: 'Manage Orders',     route: '/admin/orders',    iconKey: 'orders'    },
+          { label: 'Manage Products',   route: '/admin/products',  iconKey: 'products'  },
+        ];
+        break;
+      default: // INDIVIDUAL
+        this.navItems = [
+          { label: 'Browse Products', route: '/products',       iconKey: 'products' },
+          { label: 'My Analytics',    route: '/my-dashboard',   iconKey: 'dashboard' },
+          { label: 'My Cart',         route: '/cart',           iconKey: 'cart'     },
+          { label: 'My Orders',       route: '/order-history',  iconKey: 'history'  },
+          { label: 'AI Assistant',    route: '/chat',           iconKey: 'chat'     },
+        ];
+    }
+  }
+
+  icon(key: string): SafeHtml {
+    return this.sanitizer.bypassSecurityTrustHtml(this.svgPaths[key] || '');
+  }
+
+  isActive(route: string): boolean {
+    return this.currentRoute === route || this.currentRoute.startsWith(route + '/');
+  }
+
+  getRoleLabel(): string {
+    const map: Record<string, string> = { ADMIN: 'Platform Admin', CORPORATE: 'Store Manager' };
+    return map[this.userRole] || 'Customer';
+  }
+
+  getRoleBadgeClass(): string {
+    const map: Record<string, string> = {
+      ADMIN: 'bg-red-500/20 text-red-400 border-red-500/30',
+      CORPORATE: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+    };
+    return map[this.userRole] || 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30';
+  }
+
+  logout() { this.authService.logout(); }
+}
+
+
+--- FILE: ./src/app/shell/shell.html ---
+<div class="flex h-screen overflow-hidden w-full">
+
+  <!-- ─── Sidebar ─────────────────────────────────── -->
+  <aside class="w-60 glass-panel border-r border-white/5 flex flex-col h-full shrink-0 z-20">
+
+    <!-- Brand -->
+    <div class="p-5 border-b border-white/5 flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 shrink-0">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+        </svg>
+      </div>
+      <div class="overflow-hidden">
+        <p class="text-sm font-bold text-white tracking-tight leading-tight truncate">AI Commerce</p>
+        <span class="text-xs px-2 py-0.5 rounded-full border font-medium" [class]="getRoleBadgeClass()">
+          {{ getRoleLabel() }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Nav -->
+    <nav class="flex-1 overflow-y-auto p-3 space-y-0.5">
+      <a *ngFor="let item of navItems"
+         [routerLink]="item.route"
+         class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 cursor-pointer"
+         [ngClass]="isActive(item.route)
+           ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shadow-sm'
+           : 'text-slate-400 hover:bg-white/5 hover:text-slate-200 border border-transparent'">
+        <!-- Icon rendered via innerHTML of a wrapper span -->
+        <span class="w-5 h-5 shrink-0 flex items-center justify-center [&>svg]:w-full [&>svg]:h-full"
+              [innerHTML]="icon(item.iconKey)"></span>
+        {{ item.label }}
+      </a>
+    </nav>
+
+    <!-- User footer -->
+    <div class="p-3 border-t border-white/5">
+      <div class="flex items-center gap-3 px-3 py-2 mb-1">
+        <div class="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-300 font-bold text-sm border border-indigo-500/20 shrink-0">
+          {{ (username || '?')[0] | uppercase }}
+        </div>
+        <div class="overflow-hidden">
+          <p class="text-sm font-medium text-white truncate">{{ username }}</p>
+          <p class="text-xs text-slate-500">ID #{{ userId }}</p>
+        </div>
+      </div>
+      <button (click)="logout()"
+              class="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-colors font-medium">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16 17 21 12 16 7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+        Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <!-- ─── Page Content ──────────────────────────────── -->
+  <main class="flex-1 overflow-hidden bg-slate-900/30">
+    <router-outlet></router-outlet>
+  </main>
+
+</div>
+
+
+--- FILE: ./src/app/individual-dashboard/individual-dashboard.ts ---
+import { Component, OnInit, NgZone, ChangeDetectorRef } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
+import * as Plotly from 'plotly.js-dist-min';
+
+@Component({
+  selector: 'app-individual-dashboard',
+  standalone: true,
+  imports: [CommonModule],
+  templateUrl: './individual-dashboard.html'
+})
+export class IndividualDashboard implements OnInit {
+  orders: any[] = [];
+  userId: number = 0;
+  loading: boolean = true;
+  error: string | null = null;
+  
+  totalSpent: number = 0;
+  totalOrders: number = 0;
+  totalItems: number = 0;
+
+  constructor(
+    private http: HttpClient,
+    private router: Router,
+    private zone: NgZone,
+    private cdr: ChangeDetectorRef
+  ) {}
+
+  ngOnInit() {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        this.userId = user.id;
+      } catch (e) {}
+    }
+
+    if (!this.userId) {
+      this.router.navigate(['/login']);
+      return;
+    }
+
+    this.fetchOrders();
+  }
+
+  fetchOrders() {
+    this.http.get<any[]>(`/api/orders/user/${this.userId}`).subscribe({
+      next: (data) => {
+        this.zone.run(() => {
+          this.orders = data;
+          this.calculateStats();
+          this.loading = false;
+          this.cdr.detectChanges();
+          setTimeout(() => this.renderCharts(), 100);
+        });
+      },
+      error: (err) => {
+        this.zone.run(() => {
+          this.error = 'Failed to load order history.';
+          this.loading = false;
+          this.cdr.detectChanges();
+        });
+      }
+    });
+  }
+
+  calculateStats() {
+    this.totalOrders = this.orders.length;
+    this.totalSpent = 0;
+    this.totalItems = 0;
+    
+    for (const order of this.orders) {
+      if (order.items) {
+        for (const item of order.items) {
+          this.totalSpent += (item.unitPrice * item.quantity);
+          this.totalItems += item.quantity;
+        }
+      }
+    }
+  }
+
+  private renderCharts(): void {
+    if (this.orders.length === 0) return;
+
+    const darkLayout = {
+      paper_bgcolor: 'rgba(15,15,35,0)',
+      plot_bgcolor: 'rgba(15,15,35,0)',
+      font: { color: '#cbd5e1', family: 'Inter, sans-serif', size: 12 },
+      margin: { t: 30, r: 20, b: 80, l: 50 },
+      xaxis: { gridcolor: 'rgba(255,255,255,0.05)', zerolinecolor: 'rgba(255,255,255,0.1)' },
+      yaxis: { gridcolor: 'rgba(255,255,255,0.05)', zerolinecolor: 'rgba(255,255,255,0.1)' },
+    };
+
+    // Spending Over Time (Line Chart)
+    const timeEl = document.getElementById('chart-spending-time');
+    if (timeEl) {
+      // Group by Date (YYYY-MM-DD)
+      const spendingByDate: { [key: string]: number } = {};
+      this.orders.forEach(order => {
+        const date = new Date(order.orderDate).toISOString().split('T')[0];
+        let orderTotal = 0;
+        if (order.items) {
+          order.items.forEach((item: any) => orderTotal += (item.unitPrice * item.quantity));
+        }
+        if (!spendingByDate[date]) spendingByDate[date] = 0;
+        spendingByDate[date] += orderTotal;
+      });
+
+      const dates = Object.keys(spendingByDate).sort();
+      const amounts = dates.map(d => spendingByDate[d]);
+
+      (Plotly as any).newPlot(timeEl, [{
+        x: dates,
+        y: amounts,
+        type: 'scatter',
+        mode: 'lines+markers',
+        line: { color: '#818cf8', width: 3 },
+        marker: { color: '#6366f1', size: 8 }
+      }], { ...darkLayout, margin: { t: 30, r: 20, b: 40, l: 60 } }, { responsive: true, displayModeBar: false });
+    }
+
+    // Top Products Bought (Bar Chart)
+    const productEl = document.getElementById('chart-spending-products');
+    if (productEl) {
+      const productCounts: { [key: string]: number } = {};
+      this.orders.forEach(order => {
+        if (order.items) {
+          order.items.forEach((item: any) => {
+            const name = item.productName || 'Unknown';
+            const shortName = name.length > 20 ? name.substring(0, 20) + '…' : name;
+            if (!productCounts[shortName]) productCounts[shortName] = 0;
+            productCounts[shortName] += item.quantity;
+          });
+        }
+      });
+
+      const entries = Object.entries(productCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+      const names = entries.map(e => e[0]);
+      const quantities = entries.map(e => e[1]);
+
+      (Plotly as any).newPlot(productEl, [{
+        x: names,
+        y: quantities,
+        type: 'bar',
+        marker: {
+          color: '#34d399',
+          opacity: 0.85,
+          line: { color: 'rgba(255,255,255,0.15)', width: 1 }
+        }
+      }], { ...darkLayout }, { responsive: true, displayModeBar: false });
+    }
+  }
+}
+
+
+--- FILE: ./src/app/individual-dashboard/individual-dashboard.html ---
+<div class="flex flex-col h-full overflow-y-auto bg-slate-900/40">
+
+  <!-- Header -->
+  <header class="h-14 glass-panel border-b border-white/5 flex items-center justify-between px-6 shrink-0 sticky top-0 z-10">
+    <h1 class="text-base font-semibold text-white flex items-center gap-2">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      Personal Spending Analytics
+    </h1>
+  </header>
+
+  <!-- Loading -->
+  <div *ngIf="loading" class="flex-1 flex items-center justify-center">
+    <div class="flex flex-col items-center gap-4">
+      <div class="w-12 h-12 rounded-full border-4 border-indigo-500/30 border-t-indigo-500 animate-spin"></div>
+      <p class="text-slate-400 text-sm">Crunching your spending data...</p>
+    </div>
+  </div>
+
+  <!-- Error -->
+  <div *ngIf="error" class="flex-1 flex items-center justify-center">
+    <div class="text-center p-8">
+      <div class="text-4xl mb-4">⚠️</div>
+      <p class="text-red-400 font-medium">{{ error }}</p>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div *ngIf="!loading && !error" class="p-6 md:p-8 space-y-8 animate-fade-in">
+    
+    <div *ngIf="orders.length === 0" class="flex flex-col items-center justify-center py-20 text-slate-500">
+      <p>No purchase data available yet. Start shopping to see your analytics!</p>
+    </div>
+
+    <div *ngIf="orders.length > 0">
+      <!-- KPI Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div class="glass-card rounded-2xl p-5 border border-white/5 flex flex-col gap-2 hover:border-indigo-500/30 transition-all">
+          <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Spent</div>
+          <p class="text-3xl font-bold text-white">${{ totalSpent | number:'1.2-2' }}</p>
+        </div>
+        <div class="glass-card rounded-2xl p-5 border border-white/5 flex flex-col gap-2 hover:border-purple-500/30 transition-all">
+          <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Orders</div>
+          <p class="text-3xl font-bold text-white">{{ totalOrders }}</p>
+        </div>
+        <div class="glass-card rounded-2xl p-5 border border-white/5 flex flex-col gap-2 hover:border-cyan-500/30 transition-all">
+          <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Items Purchased</div>
+          <p class="text-3xl font-bold text-white">{{ totalItems }}</p>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="glass-card rounded-2xl p-6 border border-white/5">
+          <h3 class="text-base font-semibold text-slate-200 mb-1">Spending Over Time</h3>
+          <p class="text-xs text-slate-500 mb-4">Your purchase totals by date</p>
+          <div id="chart-spending-time" class="w-full" style="height: 300px;"></div>
+        </div>
+        
+        <div class="glass-card rounded-2xl p-6 border border-white/5">
+          <h3 class="text-base font-semibold text-slate-200 mb-1">Most Purchased Products</h3>
+          <p class="text-xs text-slate-500 mb-4">Products you buy most frequently</p>
+          <div id="chart-spending-products" class="w-full" style="height: 300px;"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+--- FILE: ./src/app/admin-audit/admin-audit.ts ---
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
+
+@Component({
+  selector: 'app-admin-audit',
+  standalone: true,
+  imports: [CommonModule],
+  templateUrl: './admin-audit.html'
+})
+export class AdminAudit implements OnInit {
+  logs: any[] = [];
+  loading = true;
+  userRole = '';
+
+  constructor(private http: HttpClient, private router: Router) {}
+
+  ngOnInit() {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        this.userRole = user.role;
+      } catch (e) {}
+    }
+
+    if (this.userRole !== 'ADMIN') {
+      this.router.navigate(['/products']);
+      return;
+    }
+
+    this.fetchLogs();
+  }
+
+  fetchLogs() {
+    this.http.get<any[]>('/api/audit').subscribe({
+      next: (data) => {
+        // Sort newest first
+        this.logs = data.sort((a, b) => {
+          return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+        });
+        this.loading = false;
+      },
+      error: (err) => {
+        console.error('Failed to load audit logs', err);
+        this.loading = false;
+      }
+    });
+  }
+}
+
+
+--- FILE: ./src/app/admin-audit/admin-audit.html ---
+<div class="flex flex-col h-full overflow-y-auto bg-slate-900/40">
+
+  <!-- Header -->
+  <header class="h-14 glass-panel border-b border-white/5 flex items-center justify-between px-6 shrink-0 sticky top-0 z-10">
+    <h1 class="text-base font-semibold text-white flex items-center gap-2">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      System Audit Logs
+    </h1>
+    <span class="text-sm text-slate-400">Monitoring all critical write operations</span>
+  </header>
+
+  <!-- Content -->
+  <div class="p-6">
+    <div *ngIf="loading" class="flex justify-center py-20">
+      <div class="w-8 h-8 rounded-full border-2 border-indigo-500/30 border-t-indigo-500 animate-spin"></div>
+    </div>
+
+    <div *ngIf="!loading" class="glass-card rounded-2xl border border-white/5 overflow-hidden animate-fade-in">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-white/5 border-b border-white/5">
+              <th class="p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Timestamp</th>
+              <th class="p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">User</th>
+              <th class="p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Action</th>
+              <th class="p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Details</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-white/5">
+            <tr *ngFor="let log of logs" class="hover:bg-white/[0.02] transition-colors">
+              <td class="p-4 text-sm text-slate-400 font-mono">{{ log.timestamp | date:'short' }}</td>
+              <td class="p-4 text-sm font-medium text-white">{{ log.username }}</td>
+              <td class="p-4 text-sm">
+                <span class="px-2 py-1 rounded text-xs font-medium border bg-blue-500/10 text-blue-400 border-blue-500/20">
+                  {{ log.action }}
+                </span>
+              </td>
+              <td class="p-4 text-sm text-slate-400">{{ log.details }}</td>
+            </tr>
+            <tr *ngIf="logs.length === 0">
+              <td colspan="4" class="p-8 text-center text-slate-500">No audit logs found.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+--- FILE: ./src/app/admin-categories/admin-categories.ts ---
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
+import { FormsModule } from '@angular/forms';
+
+@Component({
+  selector: 'app-admin-categories',
+  standalone: true,
+  imports: [CommonModule, FormsModule],
+  template: `
+    <div class="p-6 h-full bg-slate-900/40 overflow-y-auto">
+      <h2 class="text-2xl font-bold text-white mb-6">Category Management</h2>
+      
+      <div class="glass-card p-6 rounded-2xl border border-white/5 mb-8 max-w-xl">
+        <h3 class="text-lg text-white mb-4">Add New Category</h3>
+        <div class="flex gap-4">
+          <input type="text" [(ngModel)]="newCategoryName" class="glass-input flex-1 px-4 py-2 rounded-xl text-white" placeholder="e.g. Electronics">
+          <button (click)="addCategory()" class="bg-indigo-500 px-6 py-2 rounded-xl text-white font-bold hover:bg-indigo-600">Add</button>
+        </div>
+      </div>
+
+      <div class="glass-card rounded-2xl border border-white/5 overflow-hidden max-w-xl">
+        <table class="w-full text-left text-white">
+          <thead class="bg-slate-800/30">
+            <tr><th class="p-4">ID</th><th class="p-4">Category Name</th></tr>
+          </thead>
+          <tbody class="divide-y divide-white/5">
+            <tr *ngFor="let cat of categories">
+              <td class="p-4">{{ cat.id }}</td><td class="p-4">{{ cat.name }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `
+})
+export class AdminCategories implements OnInit {
+  categories: any[] = [];
+  newCategoryName: string = '';
+
+  constructor(private http: HttpClient) {}
+
+  ngOnInit() { this.fetchCategories(); }
+
+  fetchCategories() {
+    this.http.get<any[]>('/api/categories').subscribe(data => this.categories = data);
+  }
+
+  addCategory() {
+    if(!this.newCategoryName.trim()) return;
+    this.http.post('/api/categories', { name: this.newCategoryName }).subscribe(() => {
+      this.newCategoryName = '';
+      this.fetchCategories();
+    });
+  }
+}
 
 --- FILE: ./src/plotly.d.ts ---
 declare module 'plotly.js-dist-min' {
@@ -1033,6 +3476,9 @@ declare module 'plotly.js-dist-min' {
         },
         "serve": {
           "builder": "@angular/build:dev-server",
+          "options": {
+            "proxyConfig": "proxy.conf.json"
+          },
           "configurations": {
             "production": {
               "buildTarget": "ecommercefrontend:build:production"
@@ -1161,5 +3607,15 @@ declare module 'plotly.js-dist-min' {
     "tailwindcss": "^4.1.12",
     "typescript": "~5.9.2",
     "vitest": "^4.0.8"
+  }
+}
+
+--- FILE: ./proxy.conf.json ---
+{
+  "/api": {
+    "target": "http://localhost:8080",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug"
   }
 }

@@ -1,8 +1,10 @@
 package com.example.ecommercebackend.service;
-import com.example.ecommercebackend.model.Cart;
+
+import com.example.ecommercebackend.dto.response.CartResponse;
+
 public interface CartService {
-    Cart getCartByUserId(Long userId);
-    Cart addToCart(Long userId, Long productId, Integer quantity);
-    Cart removeFromCart(Long userId, Long cartItemId);
+    CartResponse getCartByUserId(Long userId);
+    CartResponse addToCart(Long userId, Long productId, Integer quantity);
+    CartResponse removeFromCart(Long userId, Long cartItemId);
     void clearCart(Long userId);
 }
