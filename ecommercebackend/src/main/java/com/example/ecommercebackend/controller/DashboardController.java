@@ -53,6 +53,18 @@ public class DashboardController {
             }
         }
 
+        // Validate date formats strictly to prevent SQL Injection
+        if (startDate != null && !startDate.isEmpty()) {
+            if (!startDate.matches("^\\d{4}-\\d{2}-\\d{2}$")) {
+                return ResponseEntity.badRequest().build();
+            }
+        }
+        if (endDate != null && !endDate.isEmpty()) {
+            if (!endDate.matches("^\\d{4}-\\d{2}-\\d{2}$")) {
+                return ResponseEntity.badRequest().build();
+            }
+        }
+
         String dateFilter = "";
         if (startDate != null && !startDate.isEmpty() && endDate != null && !endDate.isEmpty()) {
             dateFilter = " created_at BETWEEN '" + startDate + "' AND '" + endDate + "' ";
