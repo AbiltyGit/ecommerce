@@ -2,6 +2,8 @@ package com.example.ecommercebackend.controller;
 import com.example.ecommercebackend.dto.request.ReviewRequest;
 import com.example.ecommercebackend.dto.response.ReviewResponse;
 import com.example.ecommercebackend.service.ReviewService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,5 +20,25 @@ public class ReviewController {
     @GetMapping("/{id}")
     public ResponseEntity<ReviewResponse> getReviewById(@PathVariable Long id) { return ResponseEntity.ok(reviewService.getReviewById(id)); }
     @GetMapping
-    public ResponseEntity<List<ReviewResponse>> getAllReviews() { return ResponseEntity.ok(reviewService.getAllReviews()); }
+    public ResponseEntity<Page<ReviewResponse>> getAllReviews(Pageable pageable) { 
+        return ResponseEntity.ok(reviewService.getAllReviews(pageable)); 
+    }
+
+    @GetMapping("/corporate/{corporateUserId}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
+    public ResponseEntity<Page<ReviewResponse>> getReviewsByCorporateUserId(@PathVariable Long corporateUserId, Pageable pageable) {
+        return ResponseEntity.ok(reviewService.getReviewsByCorporateUserId(corporateUserId, pageable));
+    }
+
+    @PatchMapping("/{id}/status")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
+    public ResponseEntity<ReviewResponse> updateReviewStatus(@PathVariable Long id, @RequestParam com.example.ecommercebackend.model.enums.ReviewStatus status) {
+        return ResponseEntity.ok(reviewService.updateReviewStatus(id, status));
+    }
+
+    @PostMapping("/{id}/respond")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
+    public ResponseEntity<ReviewResponse> respondToReview(@PathVariable Long id, @RequestBody String response) {
+        return ResponseEntity.ok(reviewService.respondToReview(id, response));
+    }
 }

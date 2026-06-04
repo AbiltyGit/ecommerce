@@ -23,9 +23,15 @@ public class Review {
     
     @Column(length = 2000)
     private String comment;
+
+    @Column(length = 2000)
+    private String response;
     
     private Integer helpfulVotes;
     private Integer totalVotes;
+    
+    @Enumerated(EnumType.STRING)
+    private com.example.ecommercebackend.model.enums.ReviewStatus status = com.example.ecommercebackend.model.enums.ReviewStatus.PENDING;
     
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -46,11 +52,17 @@ public class Review {
     public String getComment() { return comment; }
     public void setComment(String comment) { this.comment = comment; }
     
+    public String getResponse() { return response; }
+    public void setResponse(String response) { this.response = response; }
+    
     public Integer getHelpfulVotes() { return helpfulVotes; }
     public void setHelpfulVotes(Integer helpfulVotes) { this.helpfulVotes = helpfulVotes; }
     
     public Integer getTotalVotes() { return totalVotes; }
     public void setTotalVotes(Integer totalVotes) { this.totalVotes = totalVotes; }
+
+    public com.example.ecommercebackend.model.enums.ReviewStatus getStatus() { return status; }
+    public void setStatus(com.example.ecommercebackend.model.enums.ReviewStatus status) { this.status = status; }
     
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

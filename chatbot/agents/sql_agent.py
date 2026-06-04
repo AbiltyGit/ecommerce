@@ -5,7 +5,7 @@ import sys
 
 # Add parent dir to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from configs import AGENT_CONFIGS
+from configs import AGENT_CONFIGS, MODEL_NAME
 
 
 def sql_agent_node(state):
@@ -16,7 +16,7 @@ def sql_agent_node(state):
         return state
 
     try:
-        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+        llm = ChatOpenAI(model=MODEL_NAME, temperature=0)
         prompt = AGENT_CONFIGS["sql_agent"]["system_prompt"]
 
         user_id = state.get("user_id", "UNKNOWN")

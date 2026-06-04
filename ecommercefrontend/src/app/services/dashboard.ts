@@ -10,6 +10,8 @@ export interface DashboardStats {
   topProductsByReviews: { name: string; review_count: number }[];
   ratingDistribution: { rating: number; count: number }[];
   topCategories: { category: string; product_count: number }[];
+  storeComparison: { store_name: string; product_count: number; avg_rating: number }[];
+  customerSegmentation: { membership_type: string; user_count: number; avg_satisfaction: number }[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -18,7 +20,11 @@ export class DashboardService {
 
   constructor(private http: HttpClient) {}
 
-  getStats(): Observable<DashboardStats> {
-    return this.http.get<DashboardStats>(this.API_URL);
+  getStats(startDate?: string, endDate?: string): Observable<DashboardStats> {
+    let url = this.API_URL;
+    if (startDate && endDate) {
+      url += `?startDate=${startDate}&endDate=${endDate}`;
+    }
+    return this.http.get<DashboardStats>(url);
   }
 }

@@ -23,8 +23,21 @@ export class Products implements OnInit {
   
   currentPage: number = 0;
   totalPages: number = 0;
-  pageSize: number = 12;
+  pageSize: number = 16;
   totalElements: number = 0;
+
+  private categoryVisuals: Record<string, { gradient: string, icon: string }> = {
+    Beauty: { gradient: 'from-pink-500 to-rose-500', icon: '✨' },
+    Grocery: { gradient: 'from-emerald-500 to-green-600', icon: '🍎' },
+    Electronics: { gradient: 'from-blue-500 to-indigo-600', icon: '🔌' },
+    Fashion: { gradient: 'from-purple-500 to-indigo-500', icon: '👗' },
+    Books: { gradient: 'from-amber-500 to-orange-600', icon: '📚' },
+    Default: { gradient: 'from-slate-500 to-slate-700', icon: '📦' }
+  };
+
+  getVisuals(catName: string) {
+    return this.categoryVisuals[catName] || this.categoryVisuals['Default'];
+  }
 
   constructor(
     private http: HttpClient,
@@ -34,15 +47,7 @@ export class Products implements OnInit {
   ) {}
   
   ngOnInit() {
-    // Get user id from localStorage
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        this.userId = user.id;
-      } catch (e) {}
-    }
-
+    this.userId = this.authService.getUserId();
     this.fetchCategories();
     this.fetchProducts();
   }
@@ -65,10 +70,12 @@ export class Products implements OnInit {
 
     this.http.get<any>(url).subscribe({
       next: (data) => {
-        this.products = data.content;
-        this.totalPages = data.totalPages;
-        this.totalElements = data.totalElements;
+        this.products = data.content || (Array.isArray(data) ? data : []);
+        this.totalPages = data.page?.totalPages ?? data.totalPages ?? (Array.isArray(data) ? 1 : 0);
+        this.totalElements = data.page?.totalElements ?? data.totalElements ?? (Array.isArray(data) ? this.products.length : 0);
         this.cdr.detectChanges();
+        // Scroll to top of the container so user sees the new products
+        document.querySelector('.overflow-y-auto')?.scrollTo({ top: 0, behavior: 'smooth' });
       },
       error: (err) => { console.error('Failed to load products', err); this.cdr.detectChanges(); }
     });

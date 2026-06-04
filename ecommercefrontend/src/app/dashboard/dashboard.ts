@@ -5,16 +5,20 @@ import * as Plotly from 'plotly.js-dist-min';
 import { DashboardService, DashboardStats } from '../services/dashboard';
 import { AuthService } from '../services/auth';
 
+import { FormsModule } from '@angular/forms';
+
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './dashboard.html'
 })
 export class Dashboard implements OnInit {
   stats: DashboardStats | null = null;
   loading = true;
   error: string | null = null;
+  startDate: string = '';
+  endDate: string = '';
 
   constructor(
     private dashboardService: DashboardService,
@@ -25,7 +29,12 @@ export class Dashboard implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.dashboardService.getStats().subscribe({
+    this.loadStats();
+  }
+
+  loadStats() {
+    this.loading = true;
+    this.dashboardService.getStats(this.startDate, this.endDate).subscribe({
       next: (data) => {
         this.zone.run(() => {
           this.stats = data;
@@ -42,6 +51,18 @@ export class Dashboard implements OnInit {
         });
       }
     });
+  }
+
+  updateFilters() {
+    this.loadStats();
+  }
+
+  formatNumber(num: any): string {
+    if (num === null || num === undefined) return '0';
+    const n = Number(num);
+    if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+    if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+    return n.toLocaleString();
   }
 
   logout() {
@@ -68,7 +89,7 @@ export class Dashboard implements OnInit {
     const topProductEl = document.getElementById('chart-top-products');
     if (topProductEl && this.stats.topProductsByReviews?.length) {
       const names = this.stats.topProductsByReviews.map(p => p.name.length > 25 ? p.name.substring(0, 25) + '…' : p.name);
-      const counts = this.stats.topProductsByReviews.map(p => p.review_count);
+      const counts = this.stats.topProductsByReviews.map(p => Number(p.review_count));
       (Plotly as any).newPlot(topProductEl, [{
         x: counts,
         y: names,
@@ -85,7 +106,7 @@ export class Dashboard implements OnInit {
     const ratingEl = document.getElementById('chart-rating-dist');
     if (ratingEl && this.stats.ratingDistribution?.length) {
       const labels = this.stats.ratingDistribution.map(r => `${r.rating} ⭐`);
-      const values = this.stats.ratingDistribution.map(r => r.count);
+      const values = this.stats.ratingDistribution.map(r => Number(r.count));
       (Plotly as any).newPlot(ratingEl, [{
         labels,
         values,
@@ -101,7 +122,7 @@ export class Dashboard implements OnInit {
     const catEl = document.getElementById('chart-top-categories');
     if (catEl && this.stats.topCategories?.length) {
       const cats = this.stats.topCategories.map(c => c.category);
-      const counts2 = this.stats.topCategories.map(c => c.product_count);
+      const counts2 = this.stats.topCategories.map(c => Number(c.product_count));
       (Plotly as any).newPlot(catEl, [{
         x: cats,
         y: counts2,
@@ -112,6 +133,66 @@ export class Dashboard implements OnInit {
           line: { color: 'rgba(255,255,255,0.15)', width: 1 }
         }
       }], { ...darkLayout }, { responsive: true, displayModeBar: false });
+    }
+
+    // Chart 4: Cross-Store Comparison (Grouped Bar)
+    const storeEl = document.getElementById('chart-store-comparison');
+    if (storeEl && this.stats.storeComparison?.length) {
+      const stores = this.stats.storeComparison.map(s => s.store_name);
+      const prodCounts = this.stats.storeComparison.map(s => Number(s.product_count));
+      const ratings = this.stats.storeComparison.map(s => Number(s.avg_rating));
+
+      (Plotly as any).newPlot(storeEl, [
+        {
+          x: stores,
+          y: prodCounts,
+          name: 'Products',
+          type: 'bar',
+          marker: { color: '#6366f1' }
+        },
+        {
+          x: stores,
+          y: ratings,
+          name: 'Avg Rating',
+          type: 'scatter',
+          yaxis: 'y2',
+          marker: { color: '#f59e0b' }
+        }
+      ], {
+        ...darkLayout,
+        barmode: 'group',
+        yaxis2: {
+          title: 'Rating',
+          overlaying: 'y',
+          side: 'right',
+          range: [0, 5],
+          showgrid: false
+        },
+        legend: { orientation: 'h', y: -0.2, font: { color: '#cbd5e1' } }
+      }, { responsive: true, displayModeBar: false });
+    }
+
+    // Chart 5: Customer Segmentation (Pie/Donut for Membership Type)
+    const segEl = document.getElementById('chart-customer-segmentation');
+    if (segEl && this.stats.customerSegmentation?.length) {
+      const labels = this.stats.customerSegmentation.map(s => s.membership_type);
+      const values = this.stats.customerSegmentation.map(s => Number(s.user_count));
+
+      (Plotly as any).newPlot(segEl, [{
+        labels: labels,
+        values: values,
+        type: 'pie',
+        hole: 0.4,
+        marker: {
+          colors: ['#6366f1', '#a855f7', '#ec4899', '#f97316']
+        },
+        textinfo: 'label+percent',
+        insidetextorientation: 'radial'
+      }], {
+        ...darkLayout,
+        showlegend: true,
+        legend: { font: { color: '#cbd5e1' } }
+      }, { responsive: true, displayModeBar: false });
     }
   }
 }

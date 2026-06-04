@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterOutlet, RouterModule, Router, NavigationEnd } from '@angular/router';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
@@ -33,59 +33,72 @@ export class Shell implements OnInit {
     chat:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
     users:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
     stores:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
+    star:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
+    categories: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>`,
+    admin:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
+    profile:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
   };
 
   constructor(
     private authService: AuthService,
     private router: Router,
-    private sanitizer: DomSanitizer
+    private sanitizer: DomSanitizer,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit() {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        this.userRole = user.role;
-        this.username = user.username;
-        this.userId = user.id;
-      } catch (e) {}
+    this.userRole = this.authService.getUserRole();
+    const user = this.authService.getCurrentUser();
+    if (user) {
+      this.username = user.username;
+      this.userId = user.id;
     }
     this.buildNav();
     this.router.events
       .pipe(filter(e => e instanceof NavigationEnd))
-      .subscribe((e: any) => this.currentRoute = e.urlAfterRedirects);
+      .subscribe((e: any) => {
+        this.currentRoute = e.urlAfterRedirects;
+        this.cdr.detectChanges();
+      });
     this.currentRoute = this.router.url;
+    this.cdr.detectChanges();
   }
 
   buildNav() {
     switch (this.userRole) {
       case 'ADMIN':
         this.navItems = [
-          { label: 'Analytics Dashboard', route: '/dashboard',     iconKey: 'dashboard' },
-          { label: 'AI Data Explorer',    route: '/chat',          iconKey: 'chat'      },
-          { label: 'Order Management',    route: '/admin/orders',  iconKey: 'orders'    },
-          { label: 'Product Catalog',     route: '/admin/products',iconKey: 'products'  },
-          { label: 'User Management',     route: '/admin/users',   iconKey: 'users'     },
-          { label: 'Store Approval',      route: '/admin/stores',  iconKey: 'stores'    },
-          { label: 'System Audit Logs',   route: '/admin/audit',   iconKey: 'history'   },
+          { label: 'Admin Hub',           route: '/admin/dashboard',  iconKey: 'admin'     },
+          { label: 'Analytics Center',    route: '/dashboard',        iconKey: 'dashboard' },
+          { label: 'AI Data Explorer',    route: '/chat',             iconKey: 'chat'      },
+          { label: 'Order Management',    route: '/admin/orders',     iconKey: 'orders'    },
+          { label: 'Product Catalog',     route: '/admin/products',   iconKey: 'products'  },
+          { label: 'Category Settings',   route: '/admin/categories', iconKey: 'categories' },
+          { label: 'Review Moderation',   route: '/admin/reviews',    iconKey: 'star'      },
+          { label: 'User Management',     route: '/admin/users',      iconKey: 'users'     },
+          { label: 'Store Approvals',     route: '/admin/stores',     iconKey: 'stores'    },
+          { label: 'System Audit Logs',   route: '/admin/audit',      iconKey: 'history'   },
+          { label: 'My Profile',          route: '/profile',          iconKey: 'profile'   },
         ];
         break;
       case 'CORPORATE':
         this.navItems = [
-          { label: 'Store Dashboard',   route: '/admin/dashboard', iconKey: 'dashboard' },
-          { label: 'AI Data Explorer',  route: '/chat',            iconKey: 'chat'      },
-          { label: 'Manage Orders',     route: '/admin/orders',    iconKey: 'orders'    },
-          { label: 'Manage Products',   route: '/admin/products',  iconKey: 'products'  },
+          { label: 'Store Dashboard',     route: '/admin/dashboard',  iconKey: 'dashboard' },
+          { label: 'AI Data Explorer',    route: '/chat',             iconKey: 'chat'      },
+          { label: 'Manage Orders',       route: '/admin/orders',     iconKey: 'orders'    },
+          { label: 'Manage Products',     route: '/admin/products',   iconKey: 'products'  },
+          { label: 'Manage Reviews',      route: '/admin/reviews',    iconKey: 'star'      },
+          { label: 'My Profile',          route: '/profile',          iconKey: 'profile'   },
         ];
         break;
       default: // INDIVIDUAL
         this.navItems = [
-          { label: 'Browse Products', route: '/products',       iconKey: 'products' },
-          { label: 'My Analytics',    route: '/my-dashboard',   iconKey: 'dashboard' },
-          { label: 'My Cart',         route: '/cart',           iconKey: 'cart'     },
-          { label: 'My Orders',       route: '/order-history',  iconKey: 'history'  },
-          { label: 'AI Assistant',    route: '/chat',           iconKey: 'chat'     },
+          { label: 'Browse Products',     route: '/products',         iconKey: 'products'  },
+          { label: 'My Analytics',        route: '/my-dashboard',     iconKey: 'dashboard' },
+          { label: 'My Cart',             route: '/cart',             iconKey: 'cart'      },
+          { label: 'My Orders',           route: '/order-history',    iconKey: 'history'   },
+          { label: 'AI Assistant',        route: '/chat',             iconKey: 'chat'      },
+          { label: 'My Profile',          route: '/profile',          iconKey: 'profile'   },
         ];
     }
   }

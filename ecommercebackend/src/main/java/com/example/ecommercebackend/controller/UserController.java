@@ -2,14 +2,16 @@ package com.example.ecommercebackend.controller;
 import com.example.ecommercebackend.dto.request.UserRequest;
 import com.example.ecommercebackend.dto.response.UserResponse;
 import com.example.ecommercebackend.service.UserService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/users")
-@org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('ADMIN')")
 public class UserController {
     private final UserService userService;
     public UserController(UserService userService) { this.userService = userService; }
@@ -25,8 +27,14 @@ public class UserController {
     }
 
     @GetMapping
-    public ResponseEntity<List<UserResponse>> getAllUsers() {
-        return ResponseEntity.ok(userService.getAllUsers());
+    public ResponseEntity<Page<UserResponse>> getAllUsers(
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) String role,
+            Pageable pageable) {
+        if ((query != null && !query.isEmpty()) || (role != null && !role.isEmpty())) {
+            return ResponseEntity.ok(userService.searchUsers(query, role, pageable));
+        }
+        return ResponseEntity.ok(userService.getAllUsers(pageable));
     }
 
     @DeleteMapping("/{id}")

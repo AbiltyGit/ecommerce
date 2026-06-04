@@ -45,10 +45,11 @@ export class IndividualDashboard implements OnInit {
   }
 
   fetchOrders() {
-    this.http.get<any[]>(`/api/orders/user/${this.userId}`).subscribe({
+    this.http.get<any>(`/api/orders/user/${this.userId}`).subscribe({
       next: (data) => {
         this.zone.run(() => {
-          this.orders = data;
+          // Handle both simple list and Page object
+          this.orders = Array.isArray(data) ? data : (data.content || []);
           this.calculateStats();
           this.loading = false;
           this.cdr.detectChanges();
@@ -65,6 +66,14 @@ export class IndividualDashboard implements OnInit {
     });
   }
 
+  formatNumber(num: any): string {
+    if (num === null || num === undefined) return '0';
+    const n = Number(num);
+    if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+    if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+    return n.toLocaleString();
+  }
+
   calculateStats() {
     this.totalOrders = this.orders.length;
     this.totalSpent = 0;
@@ -73,8 +82,10 @@ export class IndividualDashboard implements OnInit {
     for (const order of this.orders) {
       if (order.items) {
         for (const item of order.items) {
-          this.totalSpent += (item.unitPrice * item.quantity);
-          this.totalItems += item.quantity;
+          const price = Number(item.unitPrice) || 0;
+          const quantity = Number(item.quantity) || 0;
+          this.totalSpent += (price * quantity);
+          this.totalItems += quantity;
         }
       }
     }

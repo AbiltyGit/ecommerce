@@ -1,4 +1,4 @@
---- BACKEND CONTEXT GENERATED ON Pzt 04 May 2026 05:09:03 +03 ---
+--- BACKEND CONTEXT GENERATED ON Pzt 04 May 2026 10:47:32 +03 ---
 
 
 --- FILE: ./src/main/java/com/example/ecommercebackend/EcommercebackendApplication.java ---
@@ -6,8 +6,11 @@ package com.example.ecommercebackend;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.data.web.config.EnableSpringDataWebSupport; // EKLENDİ
 
 @SpringBootApplication
+// Aşağıdaki satır eklendi. Spring Data'nın sayfalama sonuçlarını doğrudan DTO (JSON) formatına çevirmesini sağlar.
+@EnableSpringDataWebSupport(pageSerializationMode = EnableSpringDataWebSupport.PageSerializationMode.VIA_DTO)
 public class EcommercebackendApplication {
 
 	public static void main(String[] args) {
@@ -32,8 +35,12 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
+    @Column(unique = true, nullable = false)
     private String username;
+
+    @Column(unique = true, nullable = false)
     private String email;
+    
     private String password;
     
     @Enumerated(EnumType.STRING)
@@ -140,6 +147,16 @@ public enum OrderStatus {
     SHIPPED,
     DELIVERED,
     CANCELLED
+}
+
+
+--- FILE: ./src/main/java/com/example/ecommercebackend/model/enums/ReviewStatus.java ---
+package com.example.ecommercebackend.model.enums;
+
+public enum ReviewStatus {
+    PENDING,
+    APPROVED,
+    REJECTED
 }
 
 
@@ -412,9 +429,15 @@ public class Review {
     
     @Column(length = 2000)
     private String comment;
+
+    @Column(length = 2000)
+    private String response;
     
     private Integer helpfulVotes;
     private Integer totalVotes;
+    
+    @Enumerated(EnumType.STRING)
+    private com.example.ecommercebackend.model.enums.ReviewStatus status = com.example.ecommercebackend.model.enums.ReviewStatus.PENDING;
     
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -435,11 +458,17 @@ public class Review {
     public String getComment() { return comment; }
     public void setComment(String comment) { this.comment = comment; }
     
+    public String getResponse() { return response; }
+    public void setResponse(String response) { this.response = response; }
+    
     public Integer getHelpfulVotes() { return helpfulVotes; }
     public void setHelpfulVotes(Integer helpfulVotes) { this.helpfulVotes = helpfulVotes; }
     
     public Integer getTotalVotes() { return totalVotes; }
     public void setTotalVotes(Integer totalVotes) { this.totalVotes = totalVotes; }
+
+    public com.example.ecommercebackend.model.enums.ReviewStatus getStatus() { return status; }
+    public void setStatus(com.example.ecommercebackend.model.enums.ReviewStatus status) { this.status = status; }
     
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
@@ -663,7 +692,11 @@ public class AuditLog {
 package com.example.ecommercebackend.repository;
 
 import com.example.ecommercebackend.model.User;
+import com.example.ecommercebackend.model.enums.UserRole;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
@@ -672,6 +705,11 @@ import java.util.Optional;
 public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByUsername(String username);
     Optional<User> findByEmail(String email);
+
+    @Query("SELECT u FROM User u WHERE " +
+            "(:query IS NULL OR LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%'))) AND " +
+            "(:role IS NULL OR u.role = :role)")
+    Page<User> findByFilters(String query, UserRole role, Pageable pageable);
 }
 
 
@@ -704,6 +742,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 package com.example.ecommercebackend.repository;
 
 import com.example.ecommercebackend.model.Order;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -713,10 +753,10 @@ import java.util.List;
 
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
-    List<Order> findByUserId(Long userId);
+    Page<Order> findByUserId(Long userId, Pageable pageable);
 
     @Query("SELECT DISTINCT o FROM Order o JOIN o.items i JOIN i.product p JOIN p.store s WHERE s.corporateUser.id = :corporateUserId")
-    List<Order> findOrdersByCorporateUserId(@Param("corporateUserId") Long corporateUserId);
+    Page<Order> findOrdersByCorporateUserId(@Param("corporateUserId") Long corporateUserId, Pageable pageable);
 }
 
 
@@ -785,6 +825,8 @@ public interface ShipmentRepository extends JpaRepository<Shipment, Long> {
 package com.example.ecommercebackend.repository;
 
 import com.example.ecommercebackend.model.Review;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -794,6 +836,7 @@ import java.util.List;
 public interface ReviewRepository extends JpaRepository<Review, Long> {
     List<Review> findByProductId(Long productId);
     List<Review> findByUserId(Long userId);
+    Page<Review> findByProductStoreCorporateUserId(Long corporateUserId, Pageable pageable);
 }
 
 
@@ -866,11 +909,15 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
 package com.example.ecommercebackend.service;
 import com.example.ecommercebackend.dto.request.UserRequest;
 import com.example.ecommercebackend.dto.response.UserResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.util.List;
 public interface UserService {
     UserResponse createUser(UserRequest request);
     UserResponse getUserById(Long id);
     List<UserResponse> getAllUsers();
+    Page<UserResponse> getAllUsers(Pageable pageable);
+    Page<UserResponse> searchUsers(String query, String role, Pageable pageable);
     void deleteUser(Long id);
 }
 
@@ -883,6 +930,8 @@ import com.example.ecommercebackend.model.User;
 import com.example.ecommercebackend.repository.UserRepository;
 import com.example.ecommercebackend.service.UserService;
 import com.example.ecommercebackend.exception.ResourceNotFoundException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import java.util.List;
 @Service
@@ -908,6 +957,19 @@ public class UserServiceImpl implements UserService {
     @Override
     public List<UserResponse> getAllUsers() {
         return userRepository.findAll().stream().map(this::mapToResponse).toList();
+    }
+    @Override
+    public Page<UserResponse> getAllUsers(Pageable pageable) {
+        return userRepository.findAll(pageable).map(this::mapToResponse);
+    }
+    @Override
+    public Page<UserResponse> searchUsers(String query, String role, Pageable pageable) {
+        com.example.ecommercebackend.model.enums.UserRole roleEnum = null;
+        if (role != null && !role.isEmpty() && !role.equalsIgnoreCase("ALL")) {
+            roleEnum = com.example.ecommercebackend.model.enums.UserRole.valueOf(role.toUpperCase());
+        }
+        String searchQuery = (query == null || query.isEmpty()) ? null : query;
+        return userRepository.findByFilters(searchQuery, roleEnum, pageable).map(this::mapToResponse);
     }
     @Override
     public void deleteUser(Long id) {
@@ -1077,6 +1139,8 @@ import com.example.ecommercebackend.repository.ProductRepository;
 import com.example.ecommercebackend.service.OrderService;
 import com.example.ecommercebackend.exception.ResourceNotFoundException;
 import com.example.ecommercebackend.exception.BadRequestException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
@@ -1097,36 +1161,48 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public OrderResponse createOrder(OrderRequest request) {
+        if (request.items() == null || request.items().isEmpty()) {
+            throw new BadRequestException("Order must have at least one item");
+        }
+        
         User user = userRepository.findById(request.userId()).orElseThrow(() -> new ResourceNotFoundException("User not found"));
         
         Order order = new Order();
         order.setUser(user);
         order.setPaymentMethod(request.paymentMethod());
-        order.setShippingAddress(request.shippingAddress()); // Adres eklendi
-        order.setBillingAddress(request.billingAddress());   // Adres eklendi
+        order.setShippingAddress(request.shippingAddress());
+        order.setBillingAddress(request.billingAddress());
         order.setStatus(OrderStatus.PENDING);
         
         java.math.BigDecimal totalAmount = java.math.BigDecimal.ZERO;
         List<OrderItem> items = new ArrayList<>();
         
         for(OrderItemRequest itemReq : request.items()) {
+            if (itemReq.productId() == null || itemReq.quantity() == null || itemReq.quantity() <= 0) {
+                throw new BadRequestException("Invalid item data: productId and quantity > 0 are required");
+            }
+            
             Product product = productRepository.findById(itemReq.productId()).orElseThrow(() -> new ResourceNotFoundException("Product not found"));
-            if(product.getStockQuantity() < itemReq.quantity()) {
+            
+            if(product.getStockQuantity() != null && product.getStockQuantity() < itemReq.quantity()) {
                 throw new BadRequestException("Not enough stock for product: " + product.getName());
             }
             
-            product.setStockQuantity(product.getStockQuantity() - itemReq.quantity());
-            productRepository.save(product);
+            if (product.getStockQuantity() != null) {
+                product.setStockQuantity(product.getStockQuantity() - itemReq.quantity());
+                productRepository.save(product);
+            }
             
             OrderItem item = new OrderItem();
             item.setOrder(order);
             item.setProduct(product);
             item.setQuantity(itemReq.quantity());
-            item.setUnitPrice(product.getPrice());
+            
+            java.math.BigDecimal unitPrice = product.getPrice() != null ? product.getPrice() : java.math.BigDecimal.ZERO;
+            item.setUnitPrice(unitPrice);
             items.add(item);
             
-            // Fiyat hesaplaması
-            totalAmount = totalAmount.add(product.getPrice().multiply(java.math.BigDecimal.valueOf(itemReq.quantity())));
+            totalAmount = totalAmount.add(unitPrice.multiply(java.math.BigDecimal.valueOf(itemReq.quantity())));
         }
         order.setTotalAmount(totalAmount);
         order.setItems(items);
@@ -1141,20 +1217,20 @@ public class OrderServiceImpl implements OrderService {
     }
     @Override
     @Transactional(readOnly = true)
-    public List<OrderResponse> getAllOrders() {
-        return orderRepository.findAll().stream().map(this::mapToResponse).toList();
+    public Page<OrderResponse> getAllOrders(Pageable pageable) {
+        return orderRepository.findAll(pageable).map(this::mapToResponse);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<OrderResponse> getOrdersByUserId(Long userId) {
-        return orderRepository.findByUserId(userId).stream().map(this::mapToResponse).toList();
+    public Page<OrderResponse> getOrdersByUserId(Long userId, Pageable pageable) {
+        return orderRepository.findByUserId(userId, pageable).map(this::mapToResponse);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<OrderResponse> getOrdersByCorporateUserId(Long corporateUserId) {
-        return orderRepository.findOrdersByCorporateUserId(corporateUserId).stream().map(this::mapToResponse).toList();
+    public Page<OrderResponse> getOrdersByCorporateUserId(Long corporateUserId, Pageable pageable) {
+        return orderRepository.findOrdersByCorporateUserId(corporateUserId, pageable).map(this::mapToResponse);
     }
 
     @Override
@@ -1173,7 +1249,8 @@ public class OrderServiceImpl implements OrderService {
                 .map(i -> new OrderItemResponse(i.getId(), i.getProduct().getId(), i.getProduct().getName(), i.getQuantity(), i.getUnitPrice()))
                 .toList();
         }
-        return new OrderResponse(order.getId(), order.getUser().getId(), order.getUser().getUsername(), order.getOrderDate(), order.getStatus(), order.getPaymentMethod(), itemResponses);
+        String trackingNumber = order.getShipment() != null ? order.getShipment().getTrackingNumber() : null;
+        return new OrderResponse(order.getId(), order.getUser().getId(), order.getUser().getUsername(), order.getOrderDate(), order.getStatus(), order.getPaymentMethod(), trackingNumber, itemResponses);
     }
 
     @Override
@@ -1310,6 +1387,8 @@ import com.example.ecommercebackend.repository.ProductRepository;
 import com.example.ecommercebackend.repository.UserRepository;
 import com.example.ecommercebackend.service.ReviewService;
 import com.example.ecommercebackend.exception.ResourceNotFoundException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import java.util.List;
 @Service
@@ -1318,12 +1397,14 @@ public class ReviewServiceImpl implements ReviewService {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
     public ReviewServiceImpl(ReviewRepository reviewRepository, ProductRepository productRepository, UserRepository userRepository) { this.reviewRepository = reviewRepository; this.productRepository = productRepository; this.userRepository = userRepository; }
+    @Override
     public ReviewResponse createReview(ReviewRequest request) {
         Review review = new Review();
         review.setRating(request.rating());
         review.setComment(request.comment());
         review.setHelpfulVotes(0);
         review.setTotalVotes(0);
+        review.setStatus(com.example.ecommercebackend.model.enums.ReviewStatus.PENDING);
         if (request.productId() != null) {
             Product product = productRepository.findById(request.productId()).orElseThrow(() -> new ResourceNotFoundException("Product not found"));
             review.setProduct(product);
@@ -1334,9 +1415,51 @@ public class ReviewServiceImpl implements ReviewService {
         }
         return mapToResponse(reviewRepository.save(review));
     }
+    
+    @Override
     public ReviewResponse getReviewById(Long id) { return mapToResponse(reviewRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Review not found"))); }
+    
+    @Override
     public List<ReviewResponse> getAllReviews() { return reviewRepository.findAll().stream().map(this::mapToResponse).toList(); }
-    private ReviewResponse mapToResponse(Review review) { return new ReviewResponse(review.getId(), review.getProduct() != null ? review.getProduct().getId() : null, review.getUser() != null ? review.getUser().getId() : null, review.getRating(), review.getComment(), review.getHelpfulVotes(), review.getTotalVotes(), review.getCreatedAt()); }
+    
+    @Override
+    public Page<ReviewResponse> getAllReviews(Pageable pageable) {
+        return reviewRepository.findAll(pageable).map(this::mapToResponse);
+    }
+
+    @Override
+    public Page<ReviewResponse> getReviewsByCorporateUserId(Long corporateUserId, Pageable pageable) {
+        return reviewRepository.findByProductStoreCorporateUserId(corporateUserId, pageable).map(this::mapToResponse);
+    }
+    
+    @Override
+    public ReviewResponse updateReviewStatus(Long id, com.example.ecommercebackend.model.enums.ReviewStatus status) {
+        Review review = reviewRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Review not found"));
+        review.setStatus(status);
+        return mapToResponse(reviewRepository.save(review));
+    }
+
+    @Override
+    public ReviewResponse respondToReview(Long id, String response) {
+        Review review = reviewRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Review not found"));
+        review.setResponse(response);
+        return mapToResponse(reviewRepository.save(review));
+    }
+
+    private ReviewResponse mapToResponse(Review review) { 
+        return new ReviewResponse(
+            review.getId(), 
+            review.getProduct() != null ? review.getProduct().getId() : null, 
+            review.getUser() != null ? review.getUser().getId() : null, 
+            review.getRating(), 
+            review.getComment(), 
+            review.getResponse(),
+            review.getHelpfulVotes(), 
+            review.getTotalVotes(), 
+            review.getStatus(),
+            review.getCreatedAt()
+        ); 
+    }
 }
 
 
@@ -1376,6 +1499,39 @@ public class CustomerProfileServiceImpl implements CustomerProfileService {
         return mapToResponse(profileRepository.save(profile));
     }
     public CustomerProfileResponse getProfileById(Long id) { return mapToResponse(profileRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Profile not found"))); }
+    
+    public CustomerProfileResponse getProfileByUserId(Long userId) {
+        CustomerProfile profile = profileRepository.findByUserId(userId)
+            .orElseGet(() -> {
+                // If doesn't exist, create an empty profile
+                CustomerProfile newProfile = new CustomerProfile();
+                User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+                newProfile.setUser(user);
+                newProfile.setTotalSpend(BigDecimal.ZERO);
+                newProfile.setItemsPurchased(0);
+                newProfile.setAvgRating(0.0);
+                return profileRepository.save(newProfile);
+            });
+        return mapToResponse(profile);
+    }
+
+    public CustomerProfileResponse updateProfileByUserId(Long userId, CustomerProfileRequest request) {
+        CustomerProfile profile = profileRepository.findByUserId(userId)
+            .orElseGet(() -> {
+                CustomerProfile newProfile = new CustomerProfile();
+                User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+                newProfile.setUser(user);
+                return newProfile;
+            });
+        
+        if (request.gender() != null) profile.setGender(request.gender());
+        if (request.age() != null) profile.setAge(request.age());
+        if (request.city() != null) profile.setCity(request.city());
+        if (request.membershipType() != null) profile.setMembershipType(request.membershipType());
+        
+        return mapToResponse(profileRepository.save(profile));
+    }
+
     public List<CustomerProfileResponse> getAllProfiles() { return profileRepository.findAll().stream().map(this::mapToResponse).toList(); }
     private CustomerProfileResponse mapToResponse(CustomerProfile profile) { return new CustomerProfileResponse(profile.getId(), profile.getUser() != null ? profile.getUser().getId() : null, profile.getGender(), profile.getAge(), profile.getCity(), profile.getMembershipType(), profile.getTotalSpend(), profile.getItemsPurchased(), profile.getAvgRating(), profile.getDiscountApplied(), profile.getSatisfactionLevel()); }
 }
@@ -1395,6 +1551,7 @@ import net.sf.jsqlparser.statement.select.Select;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import net.sf.jsqlparser.util.TablesNamesFinder;
 
 import java.util.List;
 import java.util.Map;
@@ -1422,7 +1579,7 @@ public class QueryExecutionServiceImpl implements QueryExecutionService {
      */
     @Override
     @Transactional(readOnly = true)
-    public List<Map<String, Object>> executeReadOnlyQuery(String sql) {
+    public List<Map<String, Object>> executeReadOnlyQuery(String sql, Long currentUserId, String currentUserRole) {
         if (sql == null || sql.trim().isEmpty()) {
             throw new BadRequestException("SQL query cannot be empty or null.");
         }
@@ -1437,6 +1594,54 @@ public class QueryExecutionServiceImpl implements QueryExecutionService {
             }
 
             Select selectStatement = (Select) statement;
+
+            // --- TASK 2: Implement AST Table Extraction & System Table Deny-List ---
+            TablesNamesFinder tablesNamesFinder = new TablesNamesFinder();
+            List<String> tableList = tablesNamesFinder.getTableList(selectStatement);
+            List<String> systemTables = List.of("users", "refresh_tokens", "audit_logs", "customer_profiles", "carts");
+            
+            for (String table : tableList) {
+                if (systemTables.contains(table.toLowerCase())) {
+                    throw new BadRequestException("Security Violation: Access to system tables via AI is strictly prohibited.");
+                }
+            }
+
+            // --- TASK 3 & 4: Enforce Tenant Isolation ---
+            String sqlUpper = sql.toUpperCase();
+            
+            // Task 3: INDIVIDUAL Users
+            if ("INDIVIDUAL".equalsIgnoreCase(currentUserRole)) {
+                List<String> restrictedTables = List.of("orders", "reviews", "order_items", "shipments");
+                boolean accessesRestrictedTable = tableList.stream().anyMatch(t -> restrictedTables.contains(t.toLowerCase()));
+                
+                if (accessesRestrictedTable) {
+                    String userIdFilter = "USER_ID = " + currentUserId;
+                    String userIdFilterNoSpace = "USER_ID=" + currentUserId;
+                    
+                    if (!(sqlUpper.contains(userIdFilter) || sqlUpper.contains(userIdFilterNoSpace))) {
+                        throw new BadRequestException("Security Violation: You can only query your own data. Strict tenant filter missing or 'OR' bypass detected.");
+                    }
+                    if (sqlUpper.contains(" OR ")) {
+                        throw new BadRequestException("Security Violation: You can only query your own data. Strict tenant filter missing or 'OR' bypass detected.");
+                    }
+                }
+            }
+            
+            // Task 4: CORPORATE Users
+            if ("CORPORATE".equalsIgnoreCase(currentUserRole)) {
+                List<String> restrictedTables = List.of("orders", "products", "reviews", "stores");
+                boolean accessesRestrictedTable = tableList.stream().anyMatch(t -> restrictedTables.contains(t.toLowerCase()));
+                
+                if (accessesRestrictedTable) {
+                    String corporateIdFilter = "CORPORATE_USER_ID = " + currentUserId;
+                    if (!sqlUpper.contains(corporateIdFilter)) {
+                        throw new BadRequestException("Security Violation: Corporate isolation failed.");
+                    }
+                    if (sqlUpper.contains(" OR ")) {
+                        throw new BadRequestException("Security Violation: Corporate isolation failed.");
+                    }
+                }
+            }
 
             // 3. Inject LIMIT 100 to prevent OOM
             if (selectStatement.getSelectBody() instanceof PlainSelect) {
@@ -1543,7 +1748,7 @@ public class ChatServiceImpl implements ChatService {
         // 2. Execute SQL with Retry via Error Agent
         try {
             System.out.println("DEBUG (Java): Executing SQL: " + sqlQuery);
-            data = queryExecutionService.executeReadOnlyQuery(sqlQuery);
+            data = queryExecutionService.executeReadOnlyQuery(sqlQuery, userId, role);
             System.out.println("DEBUG (Java): Data fetched, row count: " + data.size());
         } catch (Exception e) {
             System.out.println("DEBUG (Java): SQL Failed: " + e.getMessage());
@@ -1557,7 +1762,7 @@ public class ChatServiceImpl implements ChatService {
                 if (fixResponse != null && fixResponse.get("sql_query") != null) {
                     sqlQuery = (String) fixResponse.get("sql_query");
                     System.out.println("DEBUG (Java): Fixed SQL: " + sqlQuery);
-                    data = queryExecutionService.executeReadOnlyQuery(sqlQuery);
+                    data = queryExecutionService.executeReadOnlyQuery(sqlQuery, userId, role);
                 } else {
                     return createFallbackResponse("Database execution failed and AI Error Agent was unable to fix the SQL syntax.");
                 }
@@ -1735,13 +1940,15 @@ public interface ProductService {
 package com.example.ecommercebackend.service;
 import com.example.ecommercebackend.dto.request.OrderRequest;
 import com.example.ecommercebackend.dto.response.OrderResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.util.List;
 public interface OrderService {
     OrderResponse createOrder(OrderRequest request);
     OrderResponse getOrderById(Long id);
-    List<OrderResponse> getAllOrders();
-    List<OrderResponse> getOrdersByUserId(Long userId);
-    List<OrderResponse> getOrdersByCorporateUserId(Long corporateUserId);
+    Page<OrderResponse> getAllOrders(Pageable pageable);
+    Page<OrderResponse> getOrdersByUserId(Long userId, Pageable pageable);
+    Page<OrderResponse> getOrdersByCorporateUserId(Long corporateUserId, Pageable pageable);
     OrderResponse updateOrderStatus(Long id, String status);
     OrderResponse updateOrder(Long id, OrderRequest request);
     void deleteOrder(Long id);
@@ -1789,11 +1996,17 @@ public interface ShipmentService {
 package com.example.ecommercebackend.service;
 import com.example.ecommercebackend.dto.request.ReviewRequest;
 import com.example.ecommercebackend.dto.response.ReviewResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.util.List;
 public interface ReviewService {
     ReviewResponse createReview(ReviewRequest request);
     ReviewResponse getReviewById(Long id);
     List<ReviewResponse> getAllReviews();
+    Page<ReviewResponse> getAllReviews(Pageable pageable);
+    Page<ReviewResponse> getReviewsByCorporateUserId(Long corporateUserId, Pageable pageable);
+    ReviewResponse updateReviewStatus(Long id, com.example.ecommercebackend.model.enums.ReviewStatus status);
+    ReviewResponse respondToReview(Long id, String response);
 }
 
 
@@ -1805,6 +2018,8 @@ import java.util.List;
 public interface CustomerProfileService {
     CustomerProfileResponse createProfile(CustomerProfileRequest request);
     CustomerProfileResponse getProfileById(Long id);
+    CustomerProfileResponse getProfileByUserId(Long userId);
+    CustomerProfileResponse updateProfileByUserId(Long userId, CustomerProfileRequest request);
     List<CustomerProfileResponse> getAllProfiles();
 }
 
@@ -1862,7 +2077,7 @@ import java.util.List;
 import java.util.Map;
 
 public interface QueryExecutionService {
-    List<Map<String, Object>> executeReadOnlyQuery(String sql);
+    List<Map<String, Object>> executeReadOnlyQuery(String sql, Long currentUserId, String currentUserRole);
 }
 
 
@@ -1894,8 +2109,10 @@ package com.example.ecommercebackend.controller;
 import com.example.ecommercebackend.dto.request.ProductRequest;
 import com.example.ecommercebackend.dto.response.ProductResponse;
 import com.example.ecommercebackend.service.ProductService;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
@@ -1905,7 +2122,7 @@ public class ProductController {
     private final ProductService productService;
     public ProductController(ProductService productService) { this.productService = productService; }
 
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
     @PostMapping
     public ResponseEntity<ProductResponse> createProduct(@RequestBody ProductRequest request) {
         return new ResponseEntity<>(productService.createProduct(request), HttpStatus.CREATED);
@@ -1917,7 +2134,7 @@ public class ProductController {
     }
 
     @GetMapping
-    public ResponseEntity<org.springframework.data.domain.Page<ProductResponse>> getAllProducts(
+    public ResponseEntity<Page<ProductResponse>> getAllProducts(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size,
             @RequestParam(required = false) String search,
@@ -1931,19 +2148,19 @@ public class ProductController {
         return ResponseEntity.ok(productService.getProductsByStoreId(storeId));
     }
 
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
     @GetMapping("/corporate/{corporateUserId}")
     public ResponseEntity<List<ProductResponse>> getProductsByCorporateUserId(@PathVariable Long corporateUserId) {
         return ResponseEntity.ok(productService.getProductsByCorporateUserId(corporateUserId));
     }
 
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
     @PutMapping("/{id}")
     public ResponseEntity<ProductResponse> updateProduct(@PathVariable Long id, @RequestBody ProductRequest request) {
         return ResponseEntity.ok(productService.updateProduct(id, request));
     }
 
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteProduct(@PathVariable Long id) {
         productService.deleteProduct(id);
@@ -1957,14 +2174,16 @@ package com.example.ecommercebackend.controller;
 import com.example.ecommercebackend.dto.request.UserRequest;
 import com.example.ecommercebackend.dto.response.UserResponse;
 import com.example.ecommercebackend.service.UserService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/users")
-@org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('ADMIN')")
 public class UserController {
     private final UserService userService;
     public UserController(UserService userService) { this.userService = userService; }
@@ -1980,8 +2199,14 @@ public class UserController {
     }
 
     @GetMapping
-    public ResponseEntity<List<UserResponse>> getAllUsers() {
-        return ResponseEntity.ok(userService.getAllUsers());
+    public ResponseEntity<Page<UserResponse>> getAllUsers(
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) String role,
+            Pageable pageable) {
+        if ((query != null && !query.isEmpty()) || (role != null && !role.isEmpty())) {
+            return ResponseEntity.ok(userService.searchUsers(query, role, pageable));
+        }
+        return ResponseEntity.ok(userService.getAllUsers(pageable));
     }
 
     @DeleteMapping("/{id}")
@@ -1997,6 +2222,8 @@ package com.example.ecommercebackend.controller;
 import com.example.ecommercebackend.dto.request.OrderRequest;
 import com.example.ecommercebackend.dto.response.OrderResponse;
 import com.example.ecommercebackend.service.OrderService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -2019,14 +2246,14 @@ public class OrderController {
     }
 
     @GetMapping("/user/{userId}")
-    public ResponseEntity<List<OrderResponse>> getOrdersByUserId(@PathVariable Long userId) {
-        return ResponseEntity.ok(orderService.getOrdersByUserId(userId));
+    public ResponseEntity<Page<OrderResponse>> getOrdersByUserId(@PathVariable Long userId, Pageable pageable) {
+        return ResponseEntity.ok(orderService.getOrdersByUserId(userId, pageable));
     }
 
     @GetMapping("/corporate/{corporateUserId}")
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
-    public ResponseEntity<List<OrderResponse>> getOrdersByCorporateUserId(@PathVariable Long corporateUserId) {
-        return ResponseEntity.ok(orderService.getOrdersByCorporateUserId(corporateUserId));
+    public ResponseEntity<Page<OrderResponse>> getOrdersByCorporateUserId(@PathVariable Long corporateUserId, Pageable pageable) {
+        return ResponseEntity.ok(orderService.getOrdersByCorporateUserId(corporateUserId, pageable));
     }
 
     @PatchMapping("/{id}/status")
@@ -2037,8 +2264,8 @@ public class OrderController {
 
     @GetMapping
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
-    public ResponseEntity<List<OrderResponse>> getAllOrders() {
-        return ResponseEntity.ok(orderService.getAllOrders());
+    public ResponseEntity<Page<OrderResponse>> getAllOrders(Pageable pageable) {
+        return ResponseEntity.ok(orderService.getAllOrders(pageable));
     }
 
     @PutMapping("/{id}")
@@ -2137,6 +2364,8 @@ package com.example.ecommercebackend.controller;
 import com.example.ecommercebackend.dto.request.ReviewRequest;
 import com.example.ecommercebackend.dto.response.ReviewResponse;
 import com.example.ecommercebackend.service.ReviewService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -2153,7 +2382,27 @@ public class ReviewController {
     @GetMapping("/{id}")
     public ResponseEntity<ReviewResponse> getReviewById(@PathVariable Long id) { return ResponseEntity.ok(reviewService.getReviewById(id)); }
     @GetMapping
-    public ResponseEntity<List<ReviewResponse>> getAllReviews() { return ResponseEntity.ok(reviewService.getAllReviews()); }
+    public ResponseEntity<Page<ReviewResponse>> getAllReviews(Pageable pageable) { 
+        return ResponseEntity.ok(reviewService.getAllReviews(pageable)); 
+    }
+
+    @GetMapping("/corporate/{corporateUserId}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
+    public ResponseEntity<Page<ReviewResponse>> getReviewsByCorporateUserId(@PathVariable Long corporateUserId, Pageable pageable) {
+        return ResponseEntity.ok(reviewService.getReviewsByCorporateUserId(corporateUserId, pageable));
+    }
+
+    @PatchMapping("/{id}/status")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
+    public ResponseEntity<ReviewResponse> updateReviewStatus(@PathVariable Long id, @RequestParam com.example.ecommercebackend.model.enums.ReviewStatus status) {
+        return ResponseEntity.ok(reviewService.updateReviewStatus(id, status));
+    }
+
+    @PostMapping("/{id}/respond")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
+    public ResponseEntity<ReviewResponse> respondToReview(@PathVariable Long id, @RequestBody String response) {
+        return ResponseEntity.ok(reviewService.respondToReview(id, response));
+    }
 }
 
 
@@ -2176,6 +2425,17 @@ public class CustomerProfileController {
     public ResponseEntity<CustomerProfileResponse> createProfile(@RequestBody CustomerProfileRequest request) { return new ResponseEntity<>(profileService.createProfile(request), HttpStatus.CREATED); }
     @GetMapping("/{id}")
     public ResponseEntity<CustomerProfileResponse> getProfileById(@PathVariable Long id) { return ResponseEntity.ok(profileService.getProfileById(id)); }
+    
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<CustomerProfileResponse> getProfileByUserId(@PathVariable Long userId) {
+        return ResponseEntity.ok(profileService.getProfileByUserId(userId));
+    }
+
+    @PutMapping("/user/{userId}")
+    public ResponseEntity<CustomerProfileResponse> updateProfileByUserId(@PathVariable Long userId, @RequestBody CustomerProfileRequest request) {
+        return ResponseEntity.ok(profileService.updateProfileByUserId(userId, request));
+    }
+
     @GetMapping
     public ResponseEntity<List<CustomerProfileResponse>> getAllProfiles() { return ResponseEntity.ok(profileService.getAllProfiles()); }
 }
@@ -2294,8 +2554,14 @@ public class ChatController {
 package com.example.ecommercebackend.controller;
 
 import com.example.ecommercebackend.service.QueryExecutionService;
+import com.example.ecommercebackend.repository.StoreRepository;
+import com.example.ecommercebackend.model.Store;
+import com.example.ecommercebackend.security.CustomUserDetails;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.Authentication;
 
 import java.util.HashMap;
 import java.util.List;
@@ -2306,77 +2572,161 @@ import java.util.Map;
 public class DashboardController {
 
     private final QueryExecutionService queryExecutionService;
+    private final StoreRepository storeRepository;
 
-    public DashboardController(QueryExecutionService queryExecutionService) {
+    public DashboardController(QueryExecutionService queryExecutionService, StoreRepository storeRepository) {
         this.queryExecutionService = queryExecutionService;
+        this.storeRepository = storeRepository;
     }
 
     @GetMapping("/stats")
-    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Map<String, Object>> getDashboardStats() {
+    @PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
+    public ResponseEntity<Map<String, Object>> getDashboardStats(
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate) {
         Map<String, Object> stats = new HashMap<>();
 
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        boolean isAdmin = auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ADMIN"));
+        Long storeId = null;
+
+        if (!isAdmin) {
+            Object principal = auth.getPrincipal();
+            if (principal instanceof CustomUserDetails) {
+                Long userId = ((CustomUserDetails) principal).getUser().getId();
+                List<Store> stores = storeRepository.findByCorporateUserId(userId);
+                if (!stores.isEmpty()) {
+                    storeId = stores.get(0).getId();
+                }
+            }
+        }
+
+        String dateFilter = "";
+        if (startDate != null && !startDate.isEmpty() && endDate != null && !endDate.isEmpty()) {
+            dateFilter = " created_at BETWEEN '" + startDate + "' AND '" + endDate + "' ";
+        }
+        
+        String orderDateFilter = "";
+        if (startDate != null && !startDate.isEmpty() && endDate != null && !endDate.isEmpty()) {
+            orderDateFilter = " order_date BETWEEN '" + startDate + "' AND '" + endDate + "' ";
+        }
+
         try {
+            // Helper for store filtering
+            String storeWhere = (storeId != null) ? " WHERE store_id = " + storeId : "";
+            String storeAnd = (storeId != null) ? " AND store_id = " + storeId : "";
+
             // KPI: Total Products
-            List<Map<String, Object>> prodCount = queryExecutionService.executeReadOnlyQuery(
-                "SELECT COUNT(*) AS total FROM products"
-            );
-            stats.put("totalProducts", prodCount.get(0).get("total"));
+            try {
+                List<Map<String, Object>> prodCount = queryExecutionService.executeReadOnlyQuery(
+                    "SELECT COUNT(*) AS total FROM products" + storeWhere
+                );
+                stats.put("totalProducts", prodCount.isEmpty() ? 0 : prodCount.get(0).get("total"));
+            } catch (Exception e) { stats.put("totalProducts", 0); System.err.println("Error products count: " + e.getMessage()); }
 
             // KPI: Total Reviews
-            List<Map<String, Object>> revCount = queryExecutionService.executeReadOnlyQuery(
-                "SELECT COUNT(*) AS total FROM reviews"
-            );
-            stats.put("totalReviews", revCount.get(0).get("total"));
+            try {
+                String revQuery = (storeId != null) 
+                    ? "SELECT COUNT(*) AS total FROM reviews r JOIN products p ON r.product_id = p.id WHERE p.store_id = " + storeId 
+                    : "SELECT COUNT(*) AS total FROM reviews";
+                if (!dateFilter.isEmpty()) {
+                    revQuery += (storeId != null) ? " AND r." + dateFilter : " WHERE " + dateFilter;
+                }
+                List<Map<String, Object>> revCount = queryExecutionService.executeReadOnlyQuery(revQuery);
+                stats.put("totalReviews", revCount.isEmpty() ? 0 : revCount.get(0).get("total"));
+            } catch (Exception e) { stats.put("totalReviews", 0); System.err.println("Error reviews count: " + e.getMessage()); }
 
             // KPI: Total Users
-            List<Map<String, Object>> userCount = queryExecutionService.executeReadOnlyQuery(
-                "SELECT COUNT(*) AS total FROM users"
-            );
-            stats.put("totalUsers", userCount.get(0).get("total"));
+            try {
+                List<Map<String, Object>> userCount = queryExecutionService.executeReadOnlyQuery("SELECT COUNT(*) AS total FROM users");
+                stats.put("totalUsers", userCount.isEmpty() ? 0 : userCount.get(0).get("total"));
+            } catch (Exception e) { stats.put("totalUsers", 0); }
 
             // KPI: Average Rating
-            List<Map<String, Object>> avgRating = queryExecutionService.executeReadOnlyQuery(
-                "SELECT ROUND(AVG(rating)::numeric, 2) AS avg FROM reviews"
-            );
-            stats.put("averageRating", avgRating.get(0).get("avg"));
+            try {
+                String avgQuery = (storeId != null)
+                    ? "SELECT COALESCE(ROUND(AVG(r.rating)::numeric, 2), 0) AS avg FROM reviews r JOIN products p ON r.product_id = p.id WHERE p.store_id = " + storeId
+                    : "SELECT COALESCE(ROUND(AVG(rating)::numeric, 2), 0) AS avg FROM reviews";
+                if (!dateFilter.isEmpty()) {
+                    avgQuery += (storeId != null) ? " AND r." + dateFilter : " WHERE " + dateFilter;
+                }
+                List<Map<String, Object>> avgRating = queryExecutionService.executeReadOnlyQuery(avgQuery);
+                stats.put("averageRating", avgRating.isEmpty() ? 0 : avgRating.get(0).get("avg"));
+            } catch (Exception e) { stats.put("averageRating", 0); System.err.println("Error avg rating: " + e.getMessage()); }
 
             // Chart 1: Top 10 Products by Review Count
-            List<Map<String, Object>> topProducts = queryExecutionService.executeReadOnlyQuery(
-                "SELECT p.name, COUNT(r.id) AS review_count FROM products p " +
-                "LEFT JOIN reviews r ON p.id = r.product_id " +
-                "GROUP BY p.name ORDER BY review_count DESC LIMIT 10"
-            );
-            stats.put("topProductsByReviews", topProducts);
-
-            // Chart 2: Rating Distribution (1-5 stars)
-            List<Map<String, Object>> ratingDist = queryExecutionService.executeReadOnlyQuery(
-                "SELECT rating, COUNT(*) AS count FROM reviews GROUP BY rating ORDER BY rating"
-            );
-            stats.put("ratingDistribution", ratingDist);
-
-            // Chart 3: Top 5 Categories by Product Count
-            List<Map<String, Object>> topCats = queryExecutionService.executeReadOnlyQuery(
-                "SELECT c.name AS category, COUNT(p.id) AS product_count FROM categories c " +
-                "LEFT JOIN products p ON c.id = p.category_id " +
-                "GROUP BY c.name ORDER BY product_count DESC LIMIT 5"
-            );
-            stats.put("topCategories", topCats);
+            try {
+                String topProdQuery = "SELECT p.name, COUNT(r.id) AS review_count FROM products p " +
+                                      "LEFT JOIN reviews r ON p.id = r.product_id ";
+                String topProdWhere = (storeId != null) ? " WHERE p.store_id = " + storeId : "";
+                if (!dateFilter.isEmpty()) {
+                    topProdWhere += (topProdWhere.isEmpty() ? " WHERE " : " AND ") + "r." + dateFilter;
+                }
+                topProdQuery += topProdWhere + " GROUP BY p.name ORDER BY review_count DESC LIMIT 10";
+                stats.put("topProductsByReviews", queryExecutionService.executeReadOnlyQuery(topProdQuery));
+            } catch (Exception e) { stats.put("topProductsByReviews", List.of()); System.err.println("Error top products: " + e.getMessage()); }
 
             // KPI: Total Revenue
-            List<Map<String, Object>> revenue = queryExecutionService.executeReadOnlyQuery(
-                "SELECT SUM(total_amount) AS total FROM orders"
-            );
-            stats.put("totalRevenue", revenue.get(0).get("total"));
+            try {
+                String revSumQuery = (storeId != null)
+                    ? "SELECT COALESCE(SUM(oi.unit_price * oi.quantity), 0) AS total FROM order_items oi JOIN products p ON oi.product_id = p.id JOIN orders o ON oi.order_id = o.id WHERE p.store_id = " + storeId
+                    : "SELECT COALESCE(SUM(total_amount), 0) AS total FROM orders";
+                if (!orderDateFilter.isEmpty()) {
+                    revSumQuery += (storeId != null) ? " AND o." + orderDateFilter : " WHERE " + orderDateFilter;
+                }
+                List<Map<String, Object>> revenue = queryExecutionService.executeReadOnlyQuery(revSumQuery);
+                stats.put("totalRevenue", revenue.isEmpty() ? 0 : (revenue.get(0).get("total") == null ? 0 : revenue.get(0).get("total")));
+            } catch (Exception e) { stats.put("totalRevenue", 0); System.err.println("Error revenue: " + e.getMessage()); }
 
             // Alert: Low Stock Products
-            List<Map<String, Object>> lowStock = queryExecutionService.executeReadOnlyQuery(
-                "SELECT name, stock_quantity FROM products WHERE stock_quantity < 10 ORDER BY stock_quantity ASC LIMIT 10"
-            );
-            stats.put("lowStockAlerts", lowStock);
+            try {
+                stats.put("lowStockAlerts", queryExecutionService.executeReadOnlyQuery(
+                    "SELECT name, stock_quantity FROM products WHERE stock_quantity < 10 " + storeAnd + " ORDER BY stock_quantity ASC LIMIT 10"
+                ));
+            } catch (Exception e) { stats.put("lowStockAlerts", List.of()); }
+
+            // Chart 4: Store Comparison
+            if (isAdmin) {
+                try {
+                    stats.put("storeComparison", queryExecutionService.executeReadOnlyQuery(
+                        "SELECT s.name AS store_name, COUNT(DISTINCT p.id) AS product_count, COALESCE(ROUND(AVG(r.rating)::numeric, 2), 0) AS avg_rating " +
+                        "FROM stores s LEFT JOIN products p ON s.id = p.store_id LEFT JOIN reviews r ON p.id = r.product_id " +
+                        "GROUP BY s.name ORDER BY product_count DESC LIMIT 10"
+                    ));
+                } catch (Exception e) { stats.put("storeComparison", List.of()); }
+            }
+            
+            // Chart 5: Customer Segmentation
+            try {
+                stats.put("customerSegmentation", queryExecutionService.executeReadOnlyQuery(
+                    "SELECT membership_type, COUNT(*) AS user_count, ROUND(AVG(satisfaction_level)::numeric, 2) AS avg_satisfaction " +
+                    "FROM customer_profiles GROUP BY membership_type ORDER BY user_count DESC"
+                ));
+            } catch (Exception e) { stats.put("customerSegmentation", List.of()); }
+
+            // NEW Chart: Rating Distribution
+            try {
+                stats.put("ratingDistribution", queryExecutionService.executeReadOnlyQuery(
+                    "SELECT rating, COUNT(*) AS count FROM reviews " + 
+                    (storeId != null ? "WHERE product_id IN (SELECT id FROM products WHERE store_id = " + storeId + ") " : "") +
+                    "GROUP BY rating ORDER BY rating ASC"
+                ));
+            } catch (Exception e) { stats.put("ratingDistribution", List.of()); }
+
+            // NEW Chart: Products by Category
+            try {
+                stats.put("topCategories", queryExecutionService.executeReadOnlyQuery(
+                    "SELECT c.name AS category, COUNT(p.id) AS product_count " +
+                    "FROM categories c LEFT JOIN products p ON c.id = p.category_id " +
+                    (storeId != null ? "WHERE p.store_id = " + storeId : "") +
+                    " GROUP BY c.name ORDER BY product_count DESC LIMIT 10"
+                ));
+            } catch (Exception e) { stats.put("topCategories", List.of()); }
 
         } catch (Exception e) {
-            stats.put("error", "Failed to fetch some stats: " + e.getMessage());
+            stats.put("error", "General dashboard failure: " + e.getMessage());
+            e.printStackTrace();
         }
 
         return ResponseEntity.ok(stats);
@@ -2583,21 +2933,34 @@ public class RestTemplateConfig {
 --- FILE: ./src/main/java/com/example/ecommercebackend/config/DataSeeder.java ---
 package com.example.ecommercebackend.config;
 
+import com.example.ecommercebackend.model.Store;
 import com.example.ecommercebackend.model.User;
+import com.example.ecommercebackend.model.CustomerProfile;
 import com.example.ecommercebackend.model.enums.UserRole;
+import com.example.ecommercebackend.repository.StoreRepository;
 import com.example.ecommercebackend.repository.UserRepository;
+import com.example.ecommercebackend.repository.CustomerProfileRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+
+import java.math.BigDecimal;
 
 @Component
 public class DataSeeder implements CommandLineRunner {
 
     private final UserRepository userRepository;
+    private final StoreRepository storeRepository;
+    private final CustomerProfileRepository customerProfileRepository;
     private final PasswordEncoder passwordEncoder;
 
-    public DataSeeder(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public DataSeeder(UserRepository userRepository, 
+                      StoreRepository storeRepository, 
+                      CustomerProfileRepository customerProfileRepository,
+                      PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
+        this.storeRepository = storeRepository;
+        this.customerProfileRepository = customerProfileRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -2619,8 +2982,30 @@ public class DataSeeder implements CommandLineRunner {
             corporate.setPassword(passwordEncoder.encode("corporate"));
             corporate.setEmail("corporate@example.com");
             corporate.setRole(UserRole.CORPORATE);
-            userRepository.save(corporate);
-            System.out.println("Mock Corporate user created: corporate / corporate");
+            User savedCorporate = userRepository.save(corporate);
+
+            // Create a store for the corporate user
+            Store store = new Store();
+            store.setName("Corporate Official Store");
+            store.setDescription("Main store managed by corporate user");
+            store.setOpen(true);
+            store.setCorporateUser(savedCorporate);
+            storeRepository.save(store);
+
+            // Enrich with profile
+            CustomerProfile profile = new CustomerProfile();
+            profile.setUser(savedCorporate);
+            profile.setCity("Istanbul");
+            profile.setGender("Male");
+            profile.setAge(35);
+            profile.setMembershipType("Premium");
+            profile.setTotalSpend(new BigDecimal("15000.00"));
+            profile.setItemsPurchased(45);
+            profile.setAvgRating(4.8);
+            profile.setSatisfactionLevel(5);
+            customerProfileRepository.save(profile);
+
+            System.out.println("Mock Corporate user AND Store created: corporate / corporate");
         }
 
         if (userRepository.findByUsername("individual").isEmpty()) {
@@ -2629,7 +3014,21 @@ public class DataSeeder implements CommandLineRunner {
             individual.setPassword(passwordEncoder.encode("individual"));
             individual.setEmail("individual@example.com");
             individual.setRole(UserRole.INDIVIDUAL);
-            userRepository.save(individual);
+            User savedIndividual = userRepository.save(individual);
+
+            // Enrich with profile
+            CustomerProfile profile = new CustomerProfile();
+            profile.setUser(savedIndividual);
+            profile.setCity("Ankara");
+            profile.setGender("Female");
+            profile.setAge(28);
+            profile.setMembershipType("Silver");
+            profile.setTotalSpend(new BigDecimal("2500.50"));
+            profile.setItemsPurchased(12);
+            profile.setAvgRating(4.2);
+            profile.setSatisfactionLevel(4);
+            customerProfileRepository.save(profile);
+
             System.out.println("Mock Individual user created: individual / individual");
         }
     }
@@ -2652,6 +3051,8 @@ public class BadRequestException extends RuntimeException {
 
 --- FILE: ./src/main/java/com/example/ecommercebackend/exception/GlobalExceptionHandler.java ---
 package com.example.ecommercebackend.exception;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -2659,6 +3060,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<String> handleNotFound(ResourceNotFoundException ex) {
         return new ResponseEntity<>(ex.getMessage(), HttpStatus.NOT_FOUND);
@@ -2669,7 +3072,8 @@ public class GlobalExceptionHandler {
     }
     @ExceptionHandler(Exception.class)
     public ResponseEntity<String> handleGeneral(Exception ex) {
-        return new ResponseEntity<>(ex.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        logger.error("Unexpected error occurred: ", ex);
+        return new ResponseEntity<>("An unexpected error occurred. Please try again later.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
 }
 
@@ -2814,8 +3218,9 @@ public record ShipmentResponse(Long id, Long orderId, String warehouseBlock, Str
 
 --- FILE: ./src/main/java/com/example/ecommercebackend/dto/response/ReviewResponse.java ---
 package com.example.ecommercebackend.dto.response;
+import com.example.ecommercebackend.model.enums.ReviewStatus;
 import java.time.LocalDateTime;
-public record ReviewResponse(Long id, Long productId, Long userId, Integer rating, String comment, Integer helpfulVotes, Integer totalVotes, LocalDateTime createdAt) {}
+public record ReviewResponse(Long id, Long productId, Long userId, Integer rating, String comment, String response, Integer helpfulVotes, Integer totalVotes, ReviewStatus status, LocalDateTime createdAt) {}
 
 
 --- FILE: ./src/main/java/com/example/ecommercebackend/dto/response/CustomerProfileResponse.java ---
@@ -2930,6 +3335,8 @@ public class CartItemResponse {
     public void setId(Long id) { this.id = id; }
     public ProductDto getProduct() { return product; }
     public void setProduct(ProductDto product) { this.product = product; }
+    public Integer getQuantity() { return quantity; }
+    public void setQuantity(Integer quantity) { this.quantity = quantity; }
 
     public static class ProductDto {
         private Long id;
@@ -2958,7 +3365,7 @@ import com.example.ecommercebackend.model.enums.OrderStatus;
 import java.time.LocalDateTime;
 import java.util.List;
 
-public record OrderResponse(Long id, Long userId, String username, @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss") LocalDateTime orderDate, OrderStatus status, String paymentMethod, List<OrderItemResponse> items) {}
+public record OrderResponse(Long id, Long userId, String username, @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss") LocalDateTime orderDate, OrderStatus status, String paymentMethod, String trackingNumber, List<OrderItemResponse> items) {}
 
 
 --- FILE: ./src/main/java/com/example/ecommercebackend/security/CustomUserDetails.java ---

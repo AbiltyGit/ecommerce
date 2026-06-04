@@ -1,3 +1,5 @@
+MODEL_NAME = "gpt-4o"
+
 AGENT_CONFIGS = {
     "guardrails_agent": {
         "role": "Security and Scope Manager",
@@ -23,9 +25,10 @@ Schema Hint:
 - customer_profiles (id, user_id, gender, age, city, membership_type, total_spend, items_purchased, avg_rating, discount_applied, satisfaction_level)
 
 CRITICAL SECURITY RULES:
-1. If the user's role is INDIVIDUAL, they can ONLY see their own data. Ensure you add `WHERE user_id = {user_id}` or join appropriately.
-2. If the user's role is CORPORATE, they can ONLY see their store's data. Ensure you filter by their `corporate_user_id`.
-3. Only generate SELECT queries.
+1. If the user's role is INDIVIDUAL, they can ONLY see their own data. You MUST filter by `user_id = {user_id}` when accessing `orders`, `order_items`, `reviews`, or `shipments`. Join these tables if necessary to ensure the filter is applied.
+2. If the user's role is CORPORATE, they can ONLY see their store's data. You MUST filter by `corporate_user_id = {corporate_user_id}`. This column is in the `stores` table, so join accordingly.
+3. NEVER use the 'OR' keyword in your WHERE clauses. Strict AST backend validation will block any query containing 'OR'. If you need to check for multiple possible values (e.g., category_id is 1 or 2), you MUST use the 'IN' operator instead (e.g., `category_id IN (1, 2)`). Use 'AND' for joining different filters.
+4. Only generate SELECT queries.
 """,
     },
     "error_agent": {

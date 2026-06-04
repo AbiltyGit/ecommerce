@@ -21,6 +21,10 @@ export class OrderHistory implements OnInit {
   reviewRating: number = 5;
   reviewComment: string = '';
   submittingReview: boolean = false;
+  currentPage: number = 0;
+  pageSize: number = 5;
+  totalPages: number = 0;
+  hasMore: boolean = true;
 
   constructor(
     private http: HttpClient,
@@ -30,13 +34,7 @@ export class OrderHistory implements OnInit {
   ) {}
 
   ngOnInit() {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        this.userId = user.id;
-      } catch (e) {}
-    }
+    this.userId = this.authService.getUserId();
 
     if (!this.userId) {
       this.router.navigate(['/login']);
@@ -46,11 +44,18 @@ export class OrderHistory implements OnInit {
     this.fetchOrders();
   }
 
-  fetchOrders() {
-    this.http.get<any[]>(`/api/orders/user/${this.userId}`).subscribe({
+  fetchOrders(append: boolean = false) {
+    this.loading = true;
+    this.http.get<any>(`/api/orders/user/${this.userId}?page=${this.currentPage}&size=${this.pageSize}&sort=orderDate,desc`).subscribe({
       next: (data) => {
-        // Sort orders by newest first
-        this.orders = data.sort((a, b) => b.id - a.id);
+        const newOrders = data.content || [];
+        if (append) {
+          this.orders = [...this.orders, ...newOrders];
+        } else {
+          this.orders = newOrders;
+        }
+        this.totalPages = data.page?.totalPages ?? data.totalPages ?? 0;
+        this.hasMore = data.last !== undefined ? !data.last : (data.page ? data.page.number < data.page.totalPages - 1 : false);
         this.loading = false;
         this.cdr.detectChanges();
       },
@@ -60,6 +65,39 @@ export class OrderHistory implements OnInit {
         this.cdr.detectChanges();
       }
     });
+  }
+
+  loadMore() {
+    if (this.hasMore) {
+      this.currentPage++;
+      this.fetchOrders(true);
+    }
+  }
+
+  exportToCSV() {
+    if (this.orders.length === 0) return;
+
+    const headers = ['Order ID', 'Date', 'Status', 'Payment Method', 'Tracking Number', 'Total Amount'];
+    const rows = this.orders.map(o => [
+      o.id,
+      o.orderDate,
+      o.status,
+      o.paymentMethod,
+      o.trackingNumber || 'N/A',
+      o.totalAmount || '0'
+    ]);
+
+    let csvContent = "data:text/csv;charset=utf-8," 
+      + headers.join(",") + "\n"
+      + rows.map(e => e.join(",")).join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `order_history_${this.userId}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 
   openReviewModal(productId: number) {

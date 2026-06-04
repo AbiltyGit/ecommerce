@@ -1,4 +1,4 @@
---- CHATBOT CONTEXT GENERATED ON Pzt 04 May 2026 05:09:29 +03 ---
+--- CHATBOT CONTEXT GENERATED ON Pzt 04 May 2026 07:24:10 +03 ---
 
 
 --- FILE: ./state.py ---
@@ -555,6 +555,9 @@ DB_URL="postgresql://user:password@localhost:5432/ecommerce_analytics"
 import pandas as pd
 from sqlalchemy import create_engine, text
 import numpy as np
+import warnings
+
+warnings.filterwarnings('ignore')
 
 # Database connection
 db_url = "postgresql://user:password@localhost:5432/ecommerce_analytics"
@@ -571,8 +574,7 @@ datasets = {
     "pakistan_orders": f"{data_dir}Pakistan Largest Ecommerce Dataset.csv"
 }
 
-print("ETL Script started...")
-
+# Helper functions
 def clean_currency(val):
     if pd.isna(val): return 0.0
     if isinstance(val, str):
@@ -582,78 +584,146 @@ def clean_currency(val):
     except:
         return 0.0
 
-def standardize_date(df, col_name):
-    df[col_name] = pd.to_datetime(df[col_name], errors='coerce').fillna(pd.Timestamp("2020-01-01"))
-    return df
+print("ETL Script started...")
 
 try:
-    print(f"Loading Amazon Reviews...")
-    df_reviews = pd.read_csv(datasets["reviews"], sep='\t', nrows=1000, on_bad_lines='skip')
-    
-    print(f"Loading UCI Retail...")
-    df_uci = pd.read_csv(datasets["uci_retail"], nrows=1000, on_bad_lines='skip', encoding='ISO-8859-1')
-    df_uci['Price'] = df_uci['Price'].apply(clean_currency)
-    df_uci = standardize_date(df_uci, 'InvoiceDate')
-    
-    print(f"Loading Customer Behavior...")
-    df_behavior = pd.read_csv(datasets["customer_behavior"], nrows=1000, on_bad_lines='skip')
-    
-    print(f"Loading Shipping Data...")
-    df_shipping = pd.read_csv(datasets["shipping"], nrows=1000, on_bad_lines='skip')
-    
-    print(f"Loading Amazon Sales...")
-    df_amazon = pd.read_csv(datasets["amazon_sales"], nrows=1000, on_bad_lines='skip', low_memory=False)
-    if 'Amount' in df_amazon.columns:
-        df_amazon['Amount'] = df_amazon['Amount'].apply(clean_currency)
-    df_amazon = standardize_date(df_amazon, 'Date')
-    
-    print(f"Loading Pakistan Orders...")
-    df_pak = pd.read_csv(datasets["pakistan_orders"], nrows=1000, on_bad_lines='skip', low_memory=False)
-    if 'price' in df_pak.columns:
-        df_pak['price'] = df_pak['price'].apply(clean_currency)
-    if 'created_at' in df_pak.columns:
-        df_pak = standardize_date(df_pak, 'created_at')
+    with engine.connect() as conn:
+        # 0. Initial Setup: Store
+        print("Ensuring default store exists...")
+        store_res = conn.execute(text("SELECT id FROM stores LIMIT 1")).fetchone()
+        if not store_res:
+            conn.execute(text("INSERT INTO stores (name, description, is_open) VALUES ('Global Store', 'Main Store for ETL', true)"))
+            conn.commit()
+            store_id = conn.execute(text("SELECT id FROM stores LIMIT 1")).fetchone()[0]
+        else:
+            store_id = store_res[0]
 
-    print("All datasets loaded and standardized (Sample 1000 rows each for testing).")
+        # 1. Categories
+        print("Processing Categories...")
+        df_reviews = pd.read_csv(datasets["reviews"], sep='\t', nrows=2000, on_bad_lines='skip')
+        unique_categories = df_reviews['product_category'].dropna().unique()
+        for cat in unique_categories:
+            res = conn.execute(text("SELECT id FROM categories WHERE name = :name"), {"name": cat}).fetchone()
+            if not res:
+                conn.execute(text("INSERT INTO categories (name) VALUES (:name)"), {"name": cat})
+        conn.commit()
+        cat_df = pd.read_sql("SELECT id, name FROM categories", conn)
+        cat_map = dict(zip(cat_df['name'], cat_df['id']))
+
+        # 2. Users & Profiles
+        print("Processing Users & Profiles...")
+        df_behavior = pd.read_csv(datasets["customer_behavior"], nrows=1000)
+        for _, row in df_behavior.iterrows():
+            uid = str(row['Customer ID'])
+            res = conn.execute(text("SELECT id FROM users WHERE username = :username"), {"username": uid}).fetchone()
+            if not res:
+                user_id = conn.execute(text("""
+                    INSERT INTO users (username, email, password, role, created_at)
+                    VALUES (:username, :email, :password, 'INDIVIDUAL', NOW())
+                    RETURNING id
+                """), {
+                    "username": uid,
+                    "email": f"{uid}@example.com",
+                    "password": "$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HCGFJZ3/GqA/vP2K3A/.u",
+                    "role": 'INDIVIDUAL'
+                }).fetchone()[0]
+                
+                # Insert Profile
+                conn.execute(text("""
+                    INSERT INTO customer_profiles (user_id, gender, age, city, membership_type, total_spend, items_purchased, avg_rating, discount_applied, satisfaction_level)
+                    VALUES (:user_id, :gender, :age, :city, :membership_type, :total_spend, :items_purchased, :avg_rating, :discount_applied, :satisfaction_level)
+                """), {
+                    "user_id": user_id,
+                    "gender": row['Gender'],
+                    "age": int(row['Age']),
+                    "city": row['City'],
+                    "membership_type": row['Membership Type'],
+                    "total_spend": float(row['Total Spend']),
+                    "items_purchased": int(row['Items Purchased']),
+                    "avg_rating": float(row['Average Rating']),
+                    "discount_applied": bool(row['Discount Applied']),
+                    "satisfaction_level": int(row['Satisfaction Level'])
+                })
+        conn.commit()
+
+        # 3. Products
+        print("Processing Products...")
+        unique_products = df_reviews[['product_id', 'product_title', 'product_category']].drop_duplicates()
+        for _, row in unique_products.iterrows():
+            res = conn.execute(text("SELECT id FROM products WHERE sku = :sku"), {"sku": row['product_id']}).fetchone()
+            if not res:
+                conn.execute(text("""
+                    INSERT INTO products (sku, name, description, price, stock_quantity, category_id, store_id)
+                    VALUES (:sku, :name, :description, :price, :stock_quantity, :category_id, :store_id)
+                """), {
+                    "sku": row['product_id'],
+                    "name": row['product_title'],
+                    "description": f"Imported from {row['product_category']}",
+                    "price": 19.99,
+                    "stock_quantity": 100,
+                    "category_id": cat_map.get(row['product_category']),
+                    "store_id": store_id
+                })
+        conn.commit()
+        prod_df = pd.read_sql("SELECT id, sku FROM products", conn)
+        prod_map = dict(zip(prod_df['sku'], prod_df['id']))
+
+        # 4. Reviews
+        print("Processing Reviews...")
+        user_df = pd.read_sql("SELECT id, username FROM users", conn)
+        user_map = dict(zip(user_df['username'], user_df['id']))
+        for _, row in df_reviews.iterrows():
+            u_id = user_map.get(str(row['customer_id']))
+            p_id = prod_map.get(row['product_id'])
+            if u_id and p_id:
+                conn.execute(text("""
+                    INSERT INTO reviews (user_id, product_id, rating, comment, helpful_votes, total_votes, status, created_at)
+                    VALUES (:user_id, :product_id, :rating, :comment, :helpful_votes, :total_votes, 'APPROVED', :created_at)
+                """), {
+                    "user_id": u_id,
+                    "product_id": p_id,
+                    "rating": int(row['star_rating']),
+                    "comment": str(row['review_body'])[:2000] if pd.notna(row['review_body']) else '',
+                    "helpful_votes": int(row['helpful_votes']),
+                    "total_votes": int(row['total_votes']),
+                    "created_at": pd.to_datetime(row['review_date'])
+                })
+        conn.commit()
+
+        # 5. Orders & Shipments
+        print("Processing Orders & Shipments from Pakistan Dataset...")
+        df_pak = pd.read_csv(datasets["pakistan_orders"], nrows=1000, low_memory=False)
+        for _, row in df_pak.iterrows():
+            u_id = user_map.get(str(row['Customer ID']))
+            if u_id and pd.notna(row['created_at']):
+                order_id = conn.execute(text("""
+                    INSERT INTO orders (user_id, order_date, status, total_amount, payment_method)
+                    VALUES (:user_id, :order_date, 'COMPLETED', :total_amount, :payment_method)
+                    RETURNING id
+                """), {
+                    "user_id": u_id,
+                    "order_date": pd.to_datetime(row['created_at']),
+                    "total_amount": clean_currency(row['grand_total']),
+                    "payment_method": row['payment_method'] if pd.notna(row['payment_method']) else 'COD'
+                }).fetchone()[0]
+                
+                # Insert Shipment
+                conn.execute(text("""
+                    INSERT INTO shipments (order_id, warehouse_block, mode_of_shipment, tracking_number, shipped_date)
+                    VALUES (:order_id, 'Block A', 'Road', :tracking, :shipped_date)
+                """), {
+                    "order_id": order_id,
+                    "tracking": f"TRK-{order_id}-{np.random.randint(1000, 9999)}",
+                    "shipped_date": pd.to_datetime(row['created_at']) + pd.Timedelta(days=1)
+                })
+        conn.commit()
+
 except Exception as e:
-    print(f"Error reading file: {e}")
+    print(f"Error in ETL: {e}")
     exit(1)
 
-with engine.connect() as conn:
-    # 1. Categories
-    print("Processing Categories...")
-    unique_categories = df_reviews['product_category'].dropna().unique()
-    for cat in unique_categories:
-        res = conn.execute(text("SELECT id FROM categories WHERE name = :name"), {"name": cat}).fetchone()
-        if not res:
-            conn.execute(text("INSERT INTO categories (name) VALUES (:name)"), {"name": cat})
-    conn.commit()
-    cat_df = pd.read_sql("SELECT id, name FROM categories", conn)
-    cat_map = dict(zip(cat_df['name'], cat_df['id']))
-
-    # 2. Users
-    print("Processing Users...")
-    unique_users = df_reviews['customer_id'].dropna().astype(str).unique()
-    for uid in unique_users:
-        res = conn.execute(text("SELECT id FROM users WHERE username = :username"), {"username": uid}).fetchone()
-        if not res:
-            conn.execute(text("""
-                INSERT INTO users (username, email, password, role, created_at)
-                VALUES (:username, :email, :password, 'INDIVIDUAL', NOW())
-            """), {
-                "username": uid,
-                "email": f"{uid}@example.com",
-                # BCrypt hash for "password"
-                "password": "$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HCGFJZ3/GqA/vP2K3A/.u", 
-                "role": 'INDIVIDUAL'
-            })
-    conn.commit()
-
-    # Stub for the other dataset inserts into normalized tables like Order, Shipment, CustomerProfiles
-    print("Processing Orders, Shipments, CustomerProfiles from 5 extra datasets... (STUBBED)")
-
 print("\n--- ETL SUMMARY ---")
-print("ETL Process Complete with standardization rules implemented! 🚀")
+print("ETL Process Complete with real data mapping! 🚀")
 
 
 --- FILE: ./test_chatbot.py ---

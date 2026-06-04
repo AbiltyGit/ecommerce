@@ -1,7 +1,8 @@
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { AuthService } from '../services/auth';
 
 @Component({
   selector: 'app-admin-products',
@@ -11,55 +12,100 @@ import { HttpClient } from '@angular/common/http';
 })
 export class AdminProducts implements OnInit {
   products: any[] = [];
+  categories: any[] = [];
   showAddModal = false;
   newProduct: any = {
-    sku: '', name: '', description: '', price: 0, stockQuantity: 0, storeId: null
+    sku: '', name: '', description: '', price: 0, stockQuantity: 0, storeId: null, categoryId: null
   };
   
   userRole = '';
   userId = 0;
 
-  constructor(private http: HttpClient) {}
+  // Pagination
+  currentPage = 0;
+  pageSize = 10;
+  totalPages = 0;
+  totalElements = 0;
+
+  constructor(
+    private http: HttpClient,
+    private authService: AuthService,
+    private cdr: ChangeDetectorRef
+  ) {}
 
   ngOnInit() {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        this.userRole = user.role;
-        this.userId = user.id;
-      } catch (e) {}
-    }
+    this.userRole = this.authService.getUserRole();
+    this.userId = this.authService.getUserId();
     this.loadProducts();
+    this.loadCategories();
   }
 
-  loadProducts() {
-    if (this.userRole === 'CORPORATE') {
-      this.http.get<any[]>(`/api/products/corporate/${this.userId}`).subscribe({
-        next: (data) => this.products = data,
-        error: (err) => console.error(err)
-      });
-    } else {
-      this.http.get<any[]>('/api/products').subscribe({
-        next: (data) => this.products = data,
-        error: (err) => console.error(err)
-      });
+  loadCategories() {
+    this.http.get<any[]>('/api/categories').subscribe({
+      next: (data) => {
+        this.categories = data;
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  loadProducts(page: number = this.currentPage) {
+    this.currentPage = page;
+    let endpoint = this.userRole === 'CORPORATE' 
+      ? `/api/products/corporate/${this.userId}`
+      : `/api/products?page=${page}&size=${this.pageSize}`;
+
+    this.http.get<any>(endpoint).subscribe({
+      next: (data) => {
+        if (Array.isArray(data)) {
+          this.products = data;
+          this.totalPages = 1;
+          this.totalElements = data.length;
+        } else {
+          this.products = data.content || [];
+          this.totalPages = data.page?.totalPages ?? data.totalPages ?? 0;
+          this.totalElements = data.page?.totalElements ?? data.totalElements ?? 0;
+        }
+        this.cdr.detectChanges();
+        // Scroll to top
+        document.querySelector('.overflow-y-auto')?.scrollTo({ top: 0, behavior: 'smooth' });
+      },
+      error: (err) => {
+        console.error(err);
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  nextPage() {
+    if (this.currentPage < this.totalPages - 1) {
+      this.loadProducts(this.currentPage + 1);
+    }
+  }
+
+  prevPage() {
+    if (this.currentPage > 0) {
+      this.loadProducts(this.currentPage - 1);
     }
   }
 
   openAddModal() {
     this.showAddModal = true;
-    this.newProduct = { sku: '', name: '', description: '', price: 0, stockQuantity: 0, storeId: null };
+    this.newProduct = { 
+      sku: '', name: '', description: '', price: 0, stockQuantity: 0, 
+      storeId: null, 
+      categoryId: this.categories.length > 0 ? this.categories[0].id : null 
+    };
     
-    // If corporate user, we need to fetch their store ID or backend should handle it.
-    // For now, if we don't have storeId, we can set a dummy or rely on backend to assign it?
-    // Wait, let's fetch their store ID first if they are corporate.
     if (this.userRole === 'CORPORATE') {
-      this.http.get<any[]>(`/api/stores/corporate/${this.userId}`).subscribe({
+      // Find the store owned by this corporate user
+      this.http.get<any[]>('/api/stores').subscribe({
         next: (stores) => {
-          if (stores && stores.length > 0) {
-            this.newProduct.storeId = stores[0].id;
+          const myStore = stores.find(s => s.corporateUserId === this.userId);
+          if (myStore) {
+            this.newProduct.storeId = myStore.id;
           }
+          this.cdr.detectChanges();
         }
       });
     }

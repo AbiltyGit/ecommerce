@@ -1,19 +1,31 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { AuthService } from '../services/auth';
 
+import { FormsModule } from '@angular/forms';
+
 @Component({
   selector: 'app-admin-users',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './admin-users.html'
 })
 export class AdminUsers implements OnInit {
   users: any[] = [];
   loading = true;
   deletingId: number | null = null;
+
+  // Filters
+  searchQuery = '';
+  selectedRole = '';
+
+  // Pagination
+  currentPage = 0;
+  pageSize = 10;
+  totalPages = 0;
+  totalElements = 0;
 
   readonly roleColors: Record<string, string> = {
     ADMIN: 'bg-red-500/10 text-red-400 border-red-500/20',
@@ -24,18 +36,61 @@ export class AdminUsers implements OnInit {
   constructor(
     private http: HttpClient,
     private router: Router,
-    private authService: AuthService
+    private authService: AuthService,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit() {
     this.fetchUsers();
   }
 
-  fetchUsers() {
-    this.http.get<any[]>('/api/users').subscribe({
-      next: (data) => { this.users = data; this.loading = false; },
-      error: (err) => { console.error(err); this.loading = false; }
+  onFilterChange() {
+    this.currentPage = 0;
+    this.fetchUsers();
+  }
+
+  fetchUsers(page: number = this.currentPage) {
+    this.loading = true;
+    this.currentPage = page;
+    this.cdr.detectChanges();
+
+    let url = `/api/users?page=${page}&size=${this.pageSize}`;
+    if (this.searchQuery) url += `&query=${encodeURIComponent(this.searchQuery)}`;
+    if (this.selectedRole && this.selectedRole !== 'ALL') url += `&role=${this.selectedRole}`;
+
+    this.http.get<any>(url).subscribe({
+      next: (res) => { 
+        console.log('Users API Response:', res);
+        
+        // Handle both standard Page and VIA_DTO Page formats
+        this.users = res.content || (Array.isArray(res) ? res : []); 
+        
+        this.totalPages = res.page?.totalPages ?? res.totalPages ?? (Array.isArray(res) ? 1 : 0);
+        this.totalElements = res.page?.totalElements ?? res.totalElements ?? (Array.isArray(res) ? res.length : 0);
+        
+        this.loading = false; 
+        this.cdr.detectChanges();
+        // Scroll to top
+        document.querySelector('.overflow-y-auto')?.scrollTo({ top: 0, behavior: 'smooth' });
+      },
+      error: (err) => { 
+        console.error('Users API Error:', err); 
+        this.loading = false; 
+        this.cdr.detectChanges();
+      }
     });
+  }
+
+  nextPage() {
+    if (this.currentPage < this.totalPages - 1) {
+      this.fetchUsers(this.currentPage + 1);
+    }
+  }
+
+  prevPage() {
+    if (this.currentPage > 0) {
+      this.fetchUsers(this.currentPage - 1);
+    }
   }
 
   deleteUser(user: any) {

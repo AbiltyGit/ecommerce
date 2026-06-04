@@ -28,17 +28,27 @@ export class ProfileComponent implements OnInit {
 
   ngOnInit() {
     this.userId = this.authService.getUserId();
+    const user = this.authService.getCurrentUser();
+    
     if (!this.userId) {
       this.router.navigate(['/login']);
       return;
     }
+
+    // Set initial user info from session
+    if (user) {
+      this.profile.username = user.username;
+      this.profile.email = user.email;
+    }
+
     this.loadProfile();
   }
 
   loadProfile() {
     this.http.get<any>(`/api/profiles/user/${this.userId}`).subscribe({
       next: (data) => {
-        this.profile = data || {};
+        // Merge API data with existing user info (username, email)
+        this.profile = { ...this.profile, ...data };
         this.loading = false;
         this.cdr.detectChanges();
       },

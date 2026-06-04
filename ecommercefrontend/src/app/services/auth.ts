@@ -59,6 +59,10 @@ export class AuthService {
 
   getUserRole(): string {
     const user = this.getCurrentUser();
-    return user ? user.role : '';
+    if (!user) return '';
+    // Backend sends roles as a list (e.g. ["ROLE_ADMIN"])
+    const roles = user.roles || [];
+    const role = roles.length > 0 ? roles[0] : '';
+    return role.replace('ROLE_', '');
   }
 }

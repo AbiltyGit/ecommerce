@@ -31,9 +31,14 @@ export class ChatService {
   }
 
   askQuestion(question: string): Observable<ChatResponse> {
+    const cleanHistory = this.chatHistory.map(msg => ({
+      role: msg.role,
+      content: msg.content
+    }));
+
     const payload = {
       question: question,
-      chatHistory: this.chatHistory
+      chatHistory: cleanHistory
     };
     return this.http.post<ChatResponse>(this.API_URL, payload);
   }

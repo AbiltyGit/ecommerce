@@ -2,8 +2,10 @@ package com.example.ecommercebackend.controller;
 import com.example.ecommercebackend.dto.request.ProductRequest;
 import com.example.ecommercebackend.dto.response.ProductResponse;
 import com.example.ecommercebackend.service.ProductService;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
@@ -13,7 +15,7 @@ public class ProductController {
     private final ProductService productService;
     public ProductController(ProductService productService) { this.productService = productService; }
 
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
     @PostMapping
     public ResponseEntity<ProductResponse> createProduct(@RequestBody ProductRequest request) {
         return new ResponseEntity<>(productService.createProduct(request), HttpStatus.CREATED);
@@ -25,7 +27,7 @@ public class ProductController {
     }
 
     @GetMapping
-    public ResponseEntity<org.springframework.data.domain.Page<ProductResponse>> getAllProducts(
+    public ResponseEntity<Page<ProductResponse>> getAllProducts(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size,
             @RequestParam(required = false) String search,
@@ -39,19 +41,19 @@ public class ProductController {
         return ResponseEntity.ok(productService.getProductsByStoreId(storeId));
     }
 
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
     @GetMapping("/corporate/{corporateUserId}")
     public ResponseEntity<List<ProductResponse>> getProductsByCorporateUserId(@PathVariable Long corporateUserId) {
         return ResponseEntity.ok(productService.getProductsByCorporateUserId(corporateUserId));
     }
 
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
     @PutMapping("/{id}")
     public ResponseEntity<ProductResponse> updateProduct(@PathVariable Long id, @RequestBody ProductRequest request) {
         return ResponseEntity.ok(productService.updateProduct(id, request));
     }
 
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CORPORATE')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteProduct(@PathVariable Long id) {
         productService.deleteProduct(id);

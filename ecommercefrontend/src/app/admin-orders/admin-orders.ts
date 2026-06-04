@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
@@ -24,18 +24,13 @@ export class AdminOrders implements OnInit {
   constructor(
     private http: HttpClient,
     private router: Router,
-    private authService: AuthService
+    private authService: AuthService,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit() {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        this.userId = user.id;
-        this.userRole = user.role;
-      } catch (e) {}
-    }
+    this.userRole = this.authService.getUserRole();
+    this.userId = this.authService.getUserId();
 
     if (!this.userId) {
       this.router.navigate(['/login']);
@@ -47,6 +42,7 @@ export class AdminOrders implements OnInit {
 
   fetchOrders() {
     this.loading = true;
+    this.cdr.detectChanges();
     let endpoint = '';
 
     if (this.userRole === 'ADMIN') {
@@ -56,14 +52,17 @@ export class AdminOrders implements OnInit {
       endpoint = `/api/orders/corporate/${this.userId}`;
     }
 
-    this.http.get<any[]>(endpoint).subscribe({
+    this.http.get<any>(endpoint).subscribe({
       next: (data) => {
-        this.orders = data.sort((a, b) => b.id - a.id);
+        const rawOrders = Array.isArray(data) ? data : (data.content || []);
+        this.orders = [...rawOrders].sort((a, b) => b.id - a.id);
         this.loading = false;
+        this.cdr.detectChanges();
       },
       error: (err) => {
         console.error('Failed to load orders', err);
         this.loading = false;
+        this.cdr.detectChanges();
       }
     });
   }
@@ -74,16 +73,19 @@ export class AdminOrders implements OnInit {
 
     const nextStatus = this.statusFlow[currentIdx + 1];
     this.updatingOrderId = order.id;
+    this.cdr.detectChanges();
 
     this.http.patch(`/api/orders/${order.id}/status?status=${nextStatus}`, {}).subscribe({
       next: (updated: any) => {
         const idx = this.orders.findIndex(o => o.id === order.id);
         if (idx !== -1) this.orders[idx].status = updated.status;
         this.updatingOrderId = null;
+        this.cdr.detectChanges();
       },
       error: (err) => {
         alert('Failed to update order status.');
         this.updatingOrderId = null;
+        this.cdr.detectChanges();
       }
     });
   }

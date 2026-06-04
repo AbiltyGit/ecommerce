@@ -33,6 +33,8 @@ launch_in_terminal "JAVA-BACKEND" "cd ../ecommercebackend && ./mvnw spring-boot:
 launch_in_terminal "PYTHON-AI" "cd ../chatbot && source $PYTHON_VENV/bin/activate && uvicorn main:app --reload"
 
 # 3. Angular Frontend
+echo "⏳ Backend'in hazır olması için bekleniyor (5s)..."
+sleep 5
 launch_in_terminal "ANGULAR-UI" "cd ../ecommercefrontend && pnpm start"
 
 echo "✅ Tüm servisler başlatıldı."

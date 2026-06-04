@@ -3,6 +3,8 @@ import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 
+import { AuthService } from '../services/auth';
+
 @Component({
   selector: 'app-admin-audit',
   standalone: true,
@@ -14,16 +16,14 @@ export class AdminAudit implements OnInit {
   loading = true;
   userRole = '';
 
-  constructor(private http: HttpClient, private router: Router) {}
+  constructor(
+    private http: HttpClient, 
+    private router: Router,
+    private authService: AuthService
+  ) {}
 
   ngOnInit() {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        this.userRole = user.role;
-      } catch (e) {}
-    }
+    this.userRole = this.authService.getUserRole();
 
     if (this.userRole !== 'ADMIN') {
       this.router.navigate(['/products']);

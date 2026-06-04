@@ -14,6 +14,7 @@ import { AdminUsers } from './admin-users/admin-users';
 import { AdminStores } from './admin-stores/admin-stores';
 import { AdminAudit } from './admin-audit/admin-audit';
 import { AdminCategories } from './admin-categories/admin-categories';
+import { AdminReviews } from './admin-reviews/admin-reviews';
 import { IndividualDashboard } from './individual-dashboard/individual-dashboard';
 import { Shell } from './shell/shell';
 import { authGuard } from './guards/auth-guard';
@@ -62,6 +63,12 @@ export const routes: Routes = [
       {
         path: 'admin/orders',
         component: AdminOrders,
+        canActivate: [roleGuard],
+        data: { expectedRoles: ['ADMIN', 'CORPORATE'] }
+      },
+      {
+        path: 'admin/reviews',
+        component: AdminReviews,
         canActivate: [roleGuard],
         data: { expectedRoles: ['ADMIN', 'CORPORATE'] }
       },

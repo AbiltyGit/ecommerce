@@ -2,6 +2,7 @@ import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
+import { AuthService } from '../services/auth';
 
 @Component({
   selector: 'app-cart',
@@ -18,13 +19,11 @@ export class CartComponent implements OnInit {
 constructor(
     private http: HttpClient, 
     private router: Router,
+    private authService: AuthService,
     private cdr: ChangeDetectorRef // EKLENDİ
   ) {}
   ngOnInit() {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try { this.userId = JSON.parse(userStr).id; } catch (e) {}
-    }
+    this.userId = this.authService.getUserId();
     if (!this.userId) { this.router.navigate(['/login']); return; }
     this.loadCart();
   }
@@ -32,7 +31,12 @@ constructor(
   loadCart() {
     this.loading = true;
     this.http.get<any>(`/api/carts/user/${this.userId}`).subscribe({
-      next: (data) => { this.cart = data; this.loading = false; this.cdr.detectChanges(); },
+      next: (data) => { 
+        console.log('Cart Data received:', data);
+        this.cart = data; 
+        this.loading = false; 
+        this.cdr.detectChanges(); 
+      },
       error: () => { this.cart = null; this.loading = false; this.cdr.detectChanges(); }
     });
   }
@@ -47,7 +51,11 @@ constructor(
 
   get totalPrice(): number {
     if (!this.cart?.items) return 0;
-    return this.cart.items.reduce((sum: number, item: any) => sum + (item.product?.price || 0) * item.quantity, 0);
+    return this.cart.items.reduce((sum: number, item: any) => {
+      const price = Number(item.product?.price) || 0;
+      const quantity = Number(item.quantity) || 0;
+      return sum + (price * quantity);
+    }, 0);
   }
 
   checkout() { this.router.navigate(['/checkout']); }

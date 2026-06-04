@@ -1,17 +1,17 @@
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { FormsModule } from '@angular/forms'; // FormsModule eklendi
+import { FormsModule } from '@angular/forms';
 
 @Component({
   selector: 'app-checkout',
   standalone: true,
-  imports: [CommonModule, FormsModule], // FormsModule eklendi
+  imports: [CommonModule, FormsModule],
   template: `
     <div class="flex h-screen overflow-hidden w-full bg-slate-900/40 items-center justify-center">
       <div class="w-full max-w-md glass-card rounded-2xl p-8 border border-white/5 shadow-2xl animate-fade-in relative overflow-y-auto max-h-[90vh]">
-        <!-- Header (Aynı kalıyor) -->
+        <!-- Header -->
         <div class="text-center mb-8">
           <h2 class="text-2xl font-bold text-white tracking-tight">Checkout</h2>
         </div>
@@ -48,7 +48,10 @@ import { FormsModule } from '@angular/forms'; // FormsModule eklendi
 
         <div *ngIf="orderSuccess" class="text-center py-8">
           <h3 class="text-xl font-bold text-white mb-2">Order Confirmed!</h3>
-          <button (click)="goToOrders()" class="w-full py-3 rounded-xl bg-slate-800 text-white transition-colors border border-white/5">
+          <div class="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-500 flex items-center justify-center mx-auto mb-6">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <button (click)="goToOrders()" class="w-full py-3 rounded-xl bg-slate-800 text-white transition-colors border border-white/5 font-semibold">
             View My Orders
           </button>
         </div>
@@ -65,7 +68,11 @@ export class Checkout implements OnInit {
   billingAddress: string = '';
   paymentMethod: string = 'CREDIT_CARD';
 
-  constructor(private http: HttpClient, private router: Router) {}
+  constructor(
+    private http: HttpClient, 
+    private router: Router,
+    private cdr: ChangeDetectorRef
+  ) {}
 
   ngOnInit() {
     const userStr = localStorage.getItem('user');
@@ -84,10 +91,13 @@ export class Checkout implements OnInit {
     }
 
     this.loading = true;
+    this.cdr.detectChanges();
+
     this.http.get<any>(`/api/carts/user/${this.userId}`).subscribe({
       next: (cart) => {
         const orderItems = cart.items.map((ci: any) => ({
-          productId: ci.product.id, quantity: ci.quantity
+          productId: ci.product.id, 
+          quantity: ci.quantity
         }));
 
         const orderReq = {
@@ -101,15 +111,29 @@ export class Checkout implements OnInit {
         this.http.post('/api/orders', orderReq).subscribe({
           next: () => {
             this.http.delete(`/api/carts/user/${this.userId}/clear`).subscribe({
-              next: () => { this.loading = false; this.orderSuccess = true; },
-              error: () => { this.loading = false; this.orderSuccess = true; }
+              next: () => { 
+                this.loading = false; 
+                this.orderSuccess = true; 
+                this.cdr.detectChanges();
+              },
+              error: () => { 
+                this.loading = false; 
+                this.orderSuccess = true; 
+                this.cdr.detectChanges();
+              }
             });
           },
           error: (err) => {
             alert('Failed to place order.');
             this.loading = false;
+            this.cdr.detectChanges();
           }
         });
+      },
+      error: (err) => {
+        alert('Failed to load cart.');
+        this.loading = false;
+        this.cdr.detectChanges();
       }
     });
   }

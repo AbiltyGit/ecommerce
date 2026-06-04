@@ -1,4 +1,4 @@
---- FRONTEND CONTEXT GENERATED ON Pzt 04 May 2026 05:09:13 +03 ---
+--- FRONTEND CONTEXT GENERATED ON Pzt 04 May 2026 07:24:37 +03 ---
 
 
 --- FILE: ./.vscode/extensions.json ---
@@ -295,6 +295,7 @@ export const appConfig: ApplicationConfig = {
 import { Routes } from '@angular/router';
 import { Login } from './login/login';
 import { Chat } from './chat/chat';
+import { ProfileComponent } from './profile/profile';
 import { Dashboard } from './dashboard/dashboard';
 import { Products } from './products/products';
 import { CartComponent } from './cart/cart';
@@ -307,6 +308,7 @@ import { AdminUsers } from './admin-users/admin-users';
 import { AdminStores } from './admin-stores/admin-stores';
 import { AdminAudit } from './admin-audit/admin-audit';
 import { AdminCategories } from './admin-categories/admin-categories';
+import { AdminReviews } from './admin-reviews/admin-reviews';
 import { IndividualDashboard } from './individual-dashboard/individual-dashboard';
 import { Shell } from './shell/shell';
 import { authGuard } from './guards/auth-guard';
@@ -327,6 +329,7 @@ export const routes: Routes = [
       { path: 'cart', component: CartComponent },
       { path: 'checkout', component: Checkout },
       { path: 'order-history', component: OrderHistory },
+      { path: 'profile', component: ProfileComponent },
       { path: 'my-dashboard', component: IndividualDashboard },
       { path: 'chat', component: Chat },
 
@@ -354,6 +357,12 @@ export const routes: Routes = [
       {
         path: 'admin/orders',
         component: AdminOrders,
+        canActivate: [roleGuard],
+        data: { expectedRoles: ['ADMIN', 'CORPORATE'] }
+      },
+      {
+        path: 'admin/reviews',
+        component: AdminReviews,
         canActivate: [roleGuard],
         data: { expectedRoles: ['ADMIN', 'CORPORATE'] }
       },
@@ -926,6 +935,32 @@ export class AuthService {
   getToken(): string | null {
     return localStorage.getItem('token');
   }
+
+  getCurrentUser(): any | null {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        return JSON.parse(userStr);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  getUserId(): number {
+    const user = this.getCurrentUser();
+    return user ? user.id : 0;
+  }
+
+  getUserRole(): string {
+    const user = this.getCurrentUser();
+    if (!user) return '';
+    // Backend sends roles as a list (e.g. ["ROLE_ADMIN"])
+    const roles = user.roles || [];
+    const role = roles.length > 0 ? roles[0] : '';
+    return role.replace('ROLE_', '');
+  }
 }
 
 
@@ -968,7 +1003,7 @@ export interface ChatResponse {
   providedIn: 'root'
 })
 export class ChatService {
-  private readonly API_URL = 'http://localhost:8080/api/chat/ask';
+  private readonly API_URL = '/api/chat/ask';
   private chatHistory: ChatMessage[] = [];
 
   constructor(private http: HttpClient) { }
@@ -1004,16 +1039,22 @@ export interface DashboardStats {
   topProductsByReviews: { name: string; review_count: number }[];
   ratingDistribution: { rating: number; count: number }[];
   topCategories: { category: string; product_count: number }[];
+  storeComparison: { store_name: string; product_count: number; avg_rating: number }[];
+  customerSegmentation: { membership_type: string; user_count: number; avg_satisfaction: number }[];
 }
 
 @Injectable({ providedIn: 'root' })
 export class DashboardService {
-  private readonly API_URL = 'http://localhost:8080/api/dashboard/stats';
+  private readonly API_URL = '/api/dashboard/stats';
 
   constructor(private http: HttpClient) {}
 
-  getStats(): Observable<DashboardStats> {
-    return this.http.get<DashboardStats>(this.API_URL);
+  getStats(startDate?: string, endDate?: string): Observable<DashboardStats> {
+    let url = this.API_URL;
+    if (startDate && endDate) {
+      url += `?startDate=${startDate}&endDate=${endDate}`;
+    }
+    return this.http.get<DashboardStats>(url);
   }
 }
 
@@ -1099,38 +1140,33 @@ export const authGuard: CanActivateFn = (route, state) => {
 --- FILE: ./src/app/guards/role-guard.ts ---
 import { CanActivateFn, Router } from '@angular/router';
 import { inject } from '@angular/core';
+import { AuthService } from '../services/auth';
 
 export const roleGuard: CanActivateFn = (route, state) => {
   const router = inject(Router);
-  const userStr = localStorage.getItem('user');
+  const authService = inject(AuthService);
   
-  if (!userStr) {
+  const userRole = authService.getUserRole();
+  
+  if (!userRole) {
     router.navigate(['/login']);
     return false;
   }
 
-  try {
-    const user = JSON.parse(userStr);
-    const expectedRoles: string[] = route.data['expectedRoles'] || [];
-    
-    // Check if user has any of the expected roles
-    const hasRole = user.roles && user.roles.some((role: string) => expectedRoles.includes(role));
-    
-    if (hasRole) {
-      return true;
+  const expectedRoles: string[] = route.data['expectedRoles'] || [];
+  
+  // Check if user has any of the expected roles
+  if (expectedRoles.includes(userRole)) {
+    return true;
+  } else {
+    // User doesn't have required role, redirect to appropriate default page
+    if (userRole === 'ADMIN') {
+      router.navigate(['/dashboard']);
+    } else if (userRole === 'CORPORATE') {
+      router.navigate(['/admin/dashboard']);
     } else {
-      // User doesn't have required role, redirect to appropriate default page
-      if (user.roles.includes('ADMIN')) {
-        router.navigate(['/dashboard']);
-      } else if (user.roles.includes('CORPORATE')) {
-        router.navigate(['/admin/dashboard']);
-      } else {
-        router.navigate(['/products']);
-      }
-      return false;
+      router.navigate(['/products']);
     }
-  } catch (e) {
-    router.navigate(['/login']);
     return false;
   }
 };
@@ -1144,16 +1180,20 @@ import * as Plotly from 'plotly.js-dist-min';
 import { DashboardService, DashboardStats } from '../services/dashboard';
 import { AuthService } from '../services/auth';
 
+import { FormsModule } from '@angular/forms';
+
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './dashboard.html'
 })
 export class Dashboard implements OnInit {
   stats: DashboardStats | null = null;
   loading = true;
   error: string | null = null;
+  startDate: string = '';
+  endDate: string = '';
 
   constructor(
     private dashboardService: DashboardService,
@@ -1164,7 +1204,12 @@ export class Dashboard implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.dashboardService.getStats().subscribe({
+    this.loadStats();
+  }
+
+  loadStats() {
+    this.loading = true;
+    this.dashboardService.getStats(this.startDate, this.endDate).subscribe({
       next: (data) => {
         this.zone.run(() => {
           this.stats = data;
@@ -1181,6 +1226,10 @@ export class Dashboard implements OnInit {
         });
       }
     });
+  }
+
+  updateFilters() {
+    this.loadStats();
   }
 
   logout() {
@@ -1252,6 +1301,66 @@ export class Dashboard implements OnInit {
         }
       }], { ...darkLayout }, { responsive: true, displayModeBar: false });
     }
+
+    // Chart 4: Cross-Store Comparison (Grouped Bar)
+    const storeEl = document.getElementById('chart-store-comparison');
+    if (storeEl && this.stats.storeComparison?.length) {
+      const stores = this.stats.storeComparison.map(s => s.store_name);
+      const prodCounts = this.stats.storeComparison.map(s => s.product_count);
+      const ratings = this.stats.storeComparison.map(s => s.avg_rating);
+
+      (Plotly as any).newPlot(storeEl, [
+        {
+          x: stores,
+          y: prodCounts,
+          name: 'Products',
+          type: 'bar',
+          marker: { color: '#6366f1' }
+        },
+        {
+          x: stores,
+          y: ratings,
+          name: 'Avg Rating',
+          type: 'scatter',
+          yaxis: 'y2',
+          marker: { color: '#f59e0b' }
+        }
+      ], {
+        ...darkLayout,
+        barmode: 'group',
+        yaxis2: {
+          title: 'Rating',
+          overlaying: 'y',
+          side: 'right',
+          range: [0, 5],
+          showgrid: false
+        },
+        legend: { orientation: 'h', y: -0.2, font: { color: '#cbd5e1' } }
+      }, { responsive: true, displayModeBar: false });
+    }
+
+    // Chart 5: Customer Segmentation (Pie/Donut for Membership Type)
+    const segEl = document.getElementById('chart-customer-segmentation');
+    if (segEl && this.stats.customerSegmentation?.length) {
+      const labels = this.stats.customerSegmentation.map(s => s.membership_type);
+      const values = this.stats.customerSegmentation.map(s => s.user_count);
+
+      (Plotly as any).newPlot(segEl, [{
+        labels: labels,
+        values: values,
+        type: 'pie',
+        hole: 0.4,
+        marker: {
+          colors: ['#6366f1', '#a855f7', '#ec4899', '#f97316']
+        },
+        textinfo: 'label+percent',
+        insidetextorientation: 'radial'
+      }], {
+        ...darkLayout,
+        showlegend: true,
+        legend: { font: { color: '#cbd5e1' } }
+      }, { responsive: true, displayModeBar: false });
+    }
   }
 }
 
@@ -1265,7 +1374,18 @@ export class Dashboard implements OnInit {
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
       Analytics Dashboard
     </h1>
-    <span class="text-sm text-slate-400">Live data from PostgreSQL</span>
+    <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2 px-3 py-1 bg-white/5 border border-white/10 rounded-lg">
+        <label class="text-[10px] uppercase font-bold text-slate-500">From</label>
+        <input type="date" [(ngModel)]="startDate" class="bg-transparent border-none text-xs text-indigo-400 focus:ring-0 cursor-pointer">
+        <div class="w-px h-3 bg-white/10"></div>
+        <label class="text-[10px] uppercase font-bold text-slate-500">To</label>
+        <input type="date" [(ngModel)]="endDate" class="bg-transparent border-none text-xs text-indigo-400 focus:ring-0 cursor-pointer">
+      </div>
+      <button (click)="updateFilters()" class="px-3 py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold transition-all">
+        Update
+      </button>
+    </div>
   </header>
 
   <!-- Loading -->
@@ -1351,10 +1471,26 @@ export class Dashboard implements OnInit {
     </div>
 
     <!-- Charts Row 2 -->
-    <div class="glass-card rounded-2xl p-6 border border-white/5">
-      <h3 class="text-base font-semibold text-slate-200 mb-1">Products by Category</h3>
-      <p class="text-xs text-slate-500 mb-4">Number of distinct products per category</p>
-      <div id="chart-top-categories" class="w-full" style="height: 280px;"></div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="glass-card rounded-2xl p-6 border border-white/5">
+        <h3 class="text-base font-semibold text-slate-200 mb-1">Products by Category</h3>
+        <p class="text-xs text-slate-500 mb-4">Number of distinct products per category</p>
+        <div id="chart-top-categories" class="w-full" style="height: 280px;"></div>
+      </div>
+      <div class="glass-card rounded-2xl p-6 border border-white/5">
+        <h3 class="text-base font-semibold text-slate-200 mb-1">Cross-Store Comparison</h3>
+        <p class="text-xs text-slate-500 mb-4">Performance metrics across all stores</p>
+        <div id="chart-store-comparison" class="w-full" style="height: 280px;"></div>
+      </div>
+    </div>
+
+    <!-- Charts Row 3 -->
+    <div class="mt-6">
+      <div class="glass-card rounded-2xl p-6 border border-white/5">
+        <h3 class="text-base font-semibold text-slate-200 mb-1">Customer Segmentation</h3>
+        <p class="text-xs text-slate-500 mb-4">User distribution by membership type</p>
+        <div id="chart-customer-segmentation" class="w-full" style="height: 350px;"></div>
+      </div>
     </div>
 
   </div>
@@ -1362,7 +1498,7 @@ export class Dashboard implements OnInit {
 
 
 --- FILE: ./src/app/products/products.ts ---
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { RouterModule, Router } from '@angular/router';
@@ -1393,27 +1529,20 @@ export class Products implements OnInit {
   constructor(
     private http: HttpClient,
     private router: Router,
-    private authService: AuthService
+    private authService: AuthService,
+    private cdr: ChangeDetectorRef
   ) {}
   
   ngOnInit() {
-    // Get user id from localStorage
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        this.userId = user.id;
-      } catch (e) {}
-    }
-
+    this.userId = this.authService.getUserId();
     this.fetchCategories();
     this.fetchProducts();
   }
 
   fetchCategories() {
     this.http.get<any[]>('/api/categories').subscribe({
-      next: (data) => this.categories = data,
-      error: (err) => console.error('Failed to load categories', err)
+      next: (data) => { this.categories = data; this.cdr.detectChanges(); },
+      error: (err) => { console.error('Failed to load categories', err); this.cdr.detectChanges(); }
     });
   }
 
@@ -1431,8 +1560,9 @@ export class Products implements OnInit {
         this.products = data.content;
         this.totalPages = data.totalPages;
         this.totalElements = data.totalElements;
+        this.cdr.detectChanges();
       },
-      error: (err) => console.error('Failed to load products', err)
+      error: (err) => { console.error('Failed to load products', err); this.cdr.detectChanges(); }
     });
   }
 
@@ -1567,10 +1697,11 @@ export class Products implements OnInit {
 
 
 --- FILE: ./src/app/cart/cart.ts ---
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
+import { AuthService } from '../services/auth';
 
 @Component({
   selector: 'app-cart',
@@ -1584,13 +1715,14 @@ export class CartComponent implements OnInit {
   userId = 0;
   removingId: number | null = null;
 
-  constructor(private http: HttpClient, private router: Router) {}
-
+constructor(
+    private http: HttpClient, 
+    private router: Router,
+    private authService: AuthService,
+    private cdr: ChangeDetectorRef // EKLENDİ
+  ) {}
   ngOnInit() {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try { this.userId = JSON.parse(userStr).id; } catch (e) {}
-    }
+    this.userId = this.authService.getUserId();
     if (!this.userId) { this.router.navigate(['/login']); return; }
     this.loadCart();
   }
@@ -1598,22 +1730,31 @@ export class CartComponent implements OnInit {
   loadCart() {
     this.loading = true;
     this.http.get<any>(`/api/carts/user/${this.userId}`).subscribe({
-      next: (data) => { this.cart = data; this.loading = false; },
-      error: () => { this.cart = null; this.loading = false; }
+      next: (data) => { 
+        console.log('Cart Data received:', data);
+        this.cart = data; 
+        this.loading = false; 
+        this.cdr.detectChanges(); 
+      },
+      error: () => { this.cart = null; this.loading = false; this.cdr.detectChanges(); }
     });
   }
 
   removeItem(itemId: number) {
     this.removingId = itemId;
     this.http.delete(`/api/carts/user/${this.userId}/remove/${itemId}`).subscribe({
-      next: () => { this.removingId = null; this.loadCart(); },
-      error: () => { this.removingId = null; }
+      next: () => { this.removingId = null; this.loadCart(); this.cdr.detectChanges(); },
+      error: () => { this.removingId = null; this.cdr.detectChanges(); }
     });
   }
 
   get totalPrice(): number {
     if (!this.cart?.items) return 0;
-    return this.cart.items.reduce((sum: number, item: any) => sum + (item.product?.price || 0) * item.quantity, 0);
+    return this.cart.items.reduce((sum: number, item: any) => {
+      const price = Number(item.product?.price) || 0;
+      const quantity = Number(item.quantity) || 0;
+      return sum + (price * quantity);
+    }, 0);
   }
 
   checkout() { this.router.navigate(['/checkout']); }
@@ -1653,10 +1794,10 @@ export class CartComponent implements OnInit {
         </div>
         <div class="flex-1 min-w-0">
           <p class="font-semibold text-white truncate">{{ item.product?.name || 'Product #' + item.product?.id }}</p>
-          <p class="text-xs text-slate-400">${{ item.product?.price?.toFixed(2) }} × {{ item.quantity }}</p>
+          <p class="text-xs text-slate-400">${{ (item.product?.price || 0) | number:'1.2-2' }} × {{ item.quantity || 0 }}</p>
         </div>
         <div class="text-right shrink-0">
-          <p class="font-bold text-white">${{ ((item.product?.price || 0) * item.quantity).toFixed(2) }}</p>
+          <p class="font-bold text-white">${{ ((item.product?.price || 0) * (item.quantity || 0)) | number:'1.2-2' }}</p>
         </div>
         <button (click)="removeItem(item.id)" [disabled]="removingId === item.id"
                 class="ml-2 w-8 h-8 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 flex items-center justify-center transition-colors border border-red-500/10 shrink-0">
@@ -1669,7 +1810,7 @@ export class CartComponent implements OnInit {
       <div class="glass-card rounded-xl p-5 border border-white/5 mt-2">
         <div class="flex items-center justify-between mb-4">
           <span class="text-slate-400 font-medium">Order Total</span>
-          <span class="text-2xl font-bold text-white">${{ totalPrice.toFixed(2) }}</span>
+          <span class="text-2xl font-bold text-white">${{ totalPrice | number:'1.2-2' }}</span>
         </div>
         <button (click)="checkout()"
                 class="w-full py-3 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white font-bold transition-colors shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2">
@@ -1684,20 +1825,20 @@ export class CartComponent implements OnInit {
 
 
 --- FILE: ./src/app/checkout/checkout.ts ---
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { FormsModule } from '@angular/forms'; // FormsModule eklendi
+import { FormsModule } from '@angular/forms';
 
 @Component({
   selector: 'app-checkout',
   standalone: true,
-  imports: [CommonModule, FormsModule], // FormsModule eklendi
+  imports: [CommonModule, FormsModule],
   template: `
     <div class="flex h-screen overflow-hidden w-full bg-slate-900/40 items-center justify-center">
       <div class="w-full max-w-md glass-card rounded-2xl p-8 border border-white/5 shadow-2xl animate-fade-in relative overflow-y-auto max-h-[90vh]">
-        <!-- Header (Aynı kalıyor) -->
+        <!-- Header -->
         <div class="text-center mb-8">
           <h2 class="text-2xl font-bold text-white tracking-tight">Checkout</h2>
         </div>
@@ -1734,7 +1875,10 @@ import { FormsModule } from '@angular/forms'; // FormsModule eklendi
 
         <div *ngIf="orderSuccess" class="text-center py-8">
           <h3 class="text-xl font-bold text-white mb-2">Order Confirmed!</h3>
-          <button (click)="goToOrders()" class="w-full py-3 rounded-xl bg-slate-800 text-white transition-colors border border-white/5">
+          <div class="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-500 flex items-center justify-center mx-auto mb-6">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <button (click)="goToOrders()" class="w-full py-3 rounded-xl bg-slate-800 text-white transition-colors border border-white/5 font-semibold">
             View My Orders
           </button>
         </div>
@@ -1751,7 +1895,11 @@ export class Checkout implements OnInit {
   billingAddress: string = '';
   paymentMethod: string = 'CREDIT_CARD';
 
-  constructor(private http: HttpClient, private router: Router) {}
+  constructor(
+    private http: HttpClient, 
+    private router: Router,
+    private cdr: ChangeDetectorRef
+  ) {}
 
   ngOnInit() {
     const userStr = localStorage.getItem('user');
@@ -1770,10 +1918,13 @@ export class Checkout implements OnInit {
     }
 
     this.loading = true;
+    this.cdr.detectChanges();
+
     this.http.get<any>(`/api/carts/user/${this.userId}`).subscribe({
       next: (cart) => {
         const orderItems = cart.items.map((ci: any) => ({
-          productId: ci.product.id, quantity: ci.quantity
+          productId: ci.product.id, 
+          quantity: ci.quantity
         }));
 
         const orderReq = {
@@ -1787,22 +1938,36 @@ export class Checkout implements OnInit {
         this.http.post('/api/orders', orderReq).subscribe({
           next: () => {
             this.http.delete(`/api/carts/user/${this.userId}/clear`).subscribe({
-              next: () => { this.loading = false; this.orderSuccess = true; },
-              error: () => { this.loading = false; this.orderSuccess = true; }
+              next: () => { 
+                this.loading = false; 
+                this.orderSuccess = true; 
+                this.cdr.detectChanges();
+              },
+              error: () => { 
+                this.loading = false; 
+                this.orderSuccess = true; 
+                this.cdr.detectChanges();
+              }
             });
           },
           error: (err) => {
             alert('Failed to place order.');
             this.loading = false;
+            this.cdr.detectChanges();
           }
         });
+      },
+      error: (err) => {
+        alert('Failed to load cart.');
+        this.loading = false;
+        this.cdr.detectChanges();
       }
     });
   }
 }
 
 --- FILE: ./src/app/admin-dashboard/admin-dashboard.ts ---
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
@@ -1822,15 +1987,23 @@ export class AdminDashboard implements OnInit {
   constructor(
     private http: HttpClient,
     private router: Router,
-    private authService: AuthService
+    private authService: AuthService,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit() {
+    this.loading = true;
+    this.cdr.detectChanges();
     this.http.get('/api/dashboard/stats').subscribe({
-      next: (data) => { this.stats = data; this.loading = false; },
+      next: (data) => { 
+        this.stats = data; 
+        this.loading = false; 
+        this.cdr.detectChanges();
+      },
       error: (err) => {
         this.error = 'Failed to load dashboard stats.';
         this.loading = false;
+        this.cdr.detectChanges();
         console.error(err);
       }
     });
@@ -1972,10 +2145,11 @@ export class AdminDashboard implements OnInit {
 
 
 --- FILE: ./src/app/admin-products/admin-products.ts ---
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { AuthService } from '../services/auth';
 
 @Component({
   selector: 'app-admin-products',
@@ -1985,55 +2159,71 @@ import { HttpClient } from '@angular/common/http';
 })
 export class AdminProducts implements OnInit {
   products: any[] = [];
+  categories: any[] = [];
   showAddModal = false;
   newProduct: any = {
-    sku: '', name: '', description: '', price: 0, stockQuantity: 0, storeId: null
+    sku: '', name: '', description: '', price: 0, stockQuantity: 0, storeId: null, categoryId: null
   };
   
   userRole = '';
   userId = 0;
 
-  constructor(private http: HttpClient) {}
+  constructor(
+    private http: HttpClient,
+    private authService: AuthService,
+    private cdr: ChangeDetectorRef
+  ) {}
 
   ngOnInit() {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        this.userRole = user.role;
-        this.userId = user.id;
-      } catch (e) {}
-    }
+    this.userRole = this.authService.getUserRole();
+    this.userId = this.authService.getUserId();
     this.loadProducts();
+    this.loadCategories();
+  }
+
+  loadCategories() {
+    this.http.get<any[]>('/api/categories').subscribe({
+      next: (data) => {
+        this.categories = data;
+        this.cdr.detectChanges();
+      }
+    });
   }
 
   loadProducts() {
-    if (this.userRole === 'CORPORATE') {
-      this.http.get<any[]>(`/api/products/corporate/${this.userId}`).subscribe({
-        next: (data) => this.products = data,
-        error: (err) => console.error(err)
-      });
-    } else {
-      this.http.get<any[]>('/api/products').subscribe({
-        next: (data) => this.products = data,
-        error: (err) => console.error(err)
-      });
-    }
+    let endpoint = this.userRole === 'CORPORATE' 
+      ? `/api/products/corporate/${this.userId}`
+      : '/api/products';
+
+    this.http.get<any>(endpoint).subscribe({
+      next: (data) => {
+        this.products = Array.isArray(data) ? data : (data.content || []);
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.error(err);
+        this.cdr.detectChanges();
+      }
+    });
   }
 
   openAddModal() {
     this.showAddModal = true;
-    this.newProduct = { sku: '', name: '', description: '', price: 0, stockQuantity: 0, storeId: null };
+    this.newProduct = { 
+      sku: '', name: '', description: '', price: 0, stockQuantity: 0, 
+      storeId: null, 
+      categoryId: this.categories.length > 0 ? this.categories[0].id : null 
+    };
     
-    // If corporate user, we need to fetch their store ID or backend should handle it.
-    // For now, if we don't have storeId, we can set a dummy or rely on backend to assign it?
-    // Wait, let's fetch their store ID first if they are corporate.
     if (this.userRole === 'CORPORATE') {
-      this.http.get<any[]>(`/api/stores/corporate/${this.userId}`).subscribe({
+      // Find the store owned by this corporate user
+      this.http.get<any[]>('/api/stores').subscribe({
         next: (stores) => {
-          if (stores && stores.length > 0) {
-            this.newProduct.storeId = stores[0].id;
+          const myStore = stores.find(s => s.corporateUserId === this.userId);
+          if (myStore) {
+            this.newProduct.storeId = myStore.id;
           }
+          this.cdr.detectChanges();
         }
       });
     }
@@ -2154,6 +2344,15 @@ export class AdminProducts implements OnInit {
             <input type="number" [(ngModel)]="newProduct.stockQuantity" name="stockQuantity" required class="w-full glass-input px-3 py-2 rounded-xl text-white text-sm">
           </div>
         </div>
+        
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">Category</label>
+          <select [(ngModel)]="newProduct.categoryId" name="categoryId" required class="w-full glass-input px-3 py-2 rounded-xl text-white text-sm appearance-none bg-slate-800">
+            <option [ngValue]="null" disabled>Select a category</option>
+            <option *ngFor="let cat of categories" [ngValue]="cat.id">{{ cat.name }}</option>
+          </select>
+        </div>
+
         <!-- Only Admin should freely pick Store ID, Corporate should automatically get their store ID -->
         <div *ngIf="userRole === 'ADMIN'">
           <label class="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">Store ID</label>
@@ -2170,7 +2369,7 @@ export class AdminProducts implements OnInit {
 
 
 --- FILE: ./src/app/order-history/order-history.ts ---
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
@@ -2193,21 +2392,20 @@ export class OrderHistory implements OnInit {
   reviewRating: number = 5;
   reviewComment: string = '';
   submittingReview: boolean = false;
+  currentPage: number = 0;
+  pageSize: number = 5;
+  totalPages: number = 0;
+  hasMore: boolean = true;
 
   constructor(
     private http: HttpClient,
     private router: Router,
-    private authService: AuthService
+    private authService: AuthService,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit() {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        this.userId = user.id;
-      } catch (e) {}
-    }
+    this.userId = this.authService.getUserId();
 
     if (!this.userId) {
       this.router.navigate(['/login']);
@@ -2217,18 +2415,60 @@ export class OrderHistory implements OnInit {
     this.fetchOrders();
   }
 
-  fetchOrders() {
-    this.http.get<any[]>(`/api/orders/user/${this.userId}`).subscribe({
+  fetchOrders(append: boolean = false) {
+    this.loading = true;
+    this.http.get<any>(`/api/orders/user/${this.userId}?page=${this.currentPage}&size=${this.pageSize}&sort=orderDate,desc`).subscribe({
       next: (data) => {
-        // Sort orders by newest first
-        this.orders = data.sort((a, b) => b.id - a.id);
+        const newOrders = data.content || [];
+        if (append) {
+          this.orders = [...this.orders, ...newOrders];
+        } else {
+          this.orders = newOrders;
+        }
+        this.totalPages = data.totalPages;
+        this.hasMore = !data.last;
         this.loading = false;
+        this.cdr.detectChanges();
       },
       error: (err) => {
         console.error('Failed to fetch orders', err);
         this.loading = false;
+        this.cdr.detectChanges();
       }
     });
+  }
+
+  loadMore() {
+    if (this.hasMore) {
+      this.currentPage++;
+      this.fetchOrders(true);
+    }
+  }
+
+  exportToCSV() {
+    if (this.orders.length === 0) return;
+
+    const headers = ['Order ID', 'Date', 'Status', 'Payment Method', 'Tracking Number', 'Total Amount'];
+    const rows = this.orders.map(o => [
+      o.id,
+      o.orderDate,
+      o.status,
+      o.paymentMethod,
+      o.trackingNumber || 'N/A',
+      o.totalAmount || '0'
+    ]);
+
+    let csvContent = "data:text/csv;charset=utf-8," 
+      + headers.join(",") + "\n"
+      + rows.map(e => e.join(",")).join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `order_history_${this.userId}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 
   openReviewModal(productId: number) {
@@ -2289,7 +2529,13 @@ export class OrderHistory implements OnInit {
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
       Purchase History
     </h1>
-    <span class="text-sm text-slate-400">{{ orders.length }} orders</span>
+    <div class="flex items-center gap-3">
+      <button (click)="exportToCSV()" class="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-500/20 hover:bg-indigo-500/10 transition-all">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        Export CSV
+      </button>
+      <span class="text-sm text-slate-400">{{ orders.length }} orders</span>
+    </div>
   </header>
 
   <div class="p-6 flex-1">
@@ -2316,6 +2562,9 @@ export class OrderHistory implements OnInit {
               <div class="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
                 {{ order.paymentMethod }}
+              </div>
+              <div *ngIf="order.trackingNumber" class="text-[10px] bg-slate-800 text-indigo-300 px-1.5 py-0.5 rounded mt-1 inline-block border border-indigo-500/10">
+                TRACKING: {{ order.trackingNumber }}
               </div>
             </div>
           </div>
@@ -2351,6 +2600,14 @@ export class OrderHistory implements OnInit {
             </button>
           </div>
         </div>
+      </div>
+
+      <!-- Load More -->
+      <div *ngIf="hasMore" class="pt-6 flex justify-center">
+        <button (click)="loadMore()" [disabled]="loading" class="px-6 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-300 text-sm hover:bg-white/10 transition-colors flex items-center gap-2">
+          <div *ngIf="loading" class="w-3 h-3 rounded-full border-2 border-slate-400/30 border-t-slate-400 animate-spin"></div>
+          {{ loading ? 'Loading...' : 'Load More Orders' }}
+        </button>
       </div>
     </div>
   </div>
@@ -2394,7 +2651,7 @@ export class OrderHistory implements OnInit {
 
 
 --- FILE: ./src/app/admin-orders/admin-orders.ts ---
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
@@ -2420,18 +2677,13 @@ export class AdminOrders implements OnInit {
   constructor(
     private http: HttpClient,
     private router: Router,
-    private authService: AuthService
+    private authService: AuthService,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit() {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        this.userId = user.id;
-        this.userRole = user.role;
-      } catch (e) {}
-    }
+    this.userRole = this.authService.getUserRole();
+    this.userId = this.authService.getUserId();
 
     if (!this.userId) {
       this.router.navigate(['/login']);
@@ -2443,6 +2695,7 @@ export class AdminOrders implements OnInit {
 
   fetchOrders() {
     this.loading = true;
+    this.cdr.detectChanges();
     let endpoint = '';
 
     if (this.userRole === 'ADMIN') {
@@ -2452,14 +2705,17 @@ export class AdminOrders implements OnInit {
       endpoint = `/api/orders/corporate/${this.userId}`;
     }
 
-    this.http.get<any[]>(endpoint).subscribe({
+    this.http.get<any>(endpoint).subscribe({
       next: (data) => {
-        this.orders = data.sort((a, b) => b.id - a.id);
+        const rawOrders = Array.isArray(data) ? data : (data.content || []);
+        this.orders = [...rawOrders].sort((a, b) => b.id - a.id);
         this.loading = false;
+        this.cdr.detectChanges();
       },
       error: (err) => {
         console.error('Failed to load orders', err);
         this.loading = false;
+        this.cdr.detectChanges();
       }
     });
   }
@@ -2470,16 +2726,19 @@ export class AdminOrders implements OnInit {
 
     const nextStatus = this.statusFlow[currentIdx + 1];
     this.updatingOrderId = order.id;
+    this.cdr.detectChanges();
 
     this.http.patch(`/api/orders/${order.id}/status?status=${nextStatus}`, {}).subscribe({
       next: (updated: any) => {
         const idx = this.orders.findIndex(o => o.id === order.id);
         if (idx !== -1) this.orders[idx].status = updated.status;
         this.updatingOrderId = null;
+        this.cdr.detectChanges();
       },
       error: (err) => {
         alert('Failed to update order status.');
         this.updatingOrderId = null;
+        this.cdr.detectChanges();
       }
     });
   }
@@ -2862,6 +3121,9 @@ export class Shell implements OnInit {
     chat:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
     users:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
     stores:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
+    star:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
+    categories: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>`,
+    admin:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
   };
 
   constructor(
@@ -2871,14 +3133,11 @@ export class Shell implements OnInit {
   ) {}
 
   ngOnInit() {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        this.userRole = user.role;
-        this.username = user.username;
-        this.userId = user.id;
-      } catch (e) {}
+    this.userRole = this.authService.getUserRole();
+    const user = this.authService.getCurrentUser();
+    if (user) {
+      this.username = user.username;
+      this.userId = user.id;
     }
     this.buildNav();
     this.router.events
@@ -2891,30 +3150,34 @@ export class Shell implements OnInit {
     switch (this.userRole) {
       case 'ADMIN':
         this.navItems = [
-          { label: 'Analytics Dashboard', route: '/dashboard',     iconKey: 'dashboard' },
-          { label: 'AI Data Explorer',    route: '/chat',          iconKey: 'chat'      },
-          { label: 'Order Management',    route: '/admin/orders',  iconKey: 'orders'    },
-          { label: 'Product Catalog',     route: '/admin/products',iconKey: 'products'  },
-          { label: 'User Management',     route: '/admin/users',   iconKey: 'users'     },
-          { label: 'Store Approval',      route: '/admin/stores',  iconKey: 'stores'    },
-          { label: 'System Audit Logs',   route: '/admin/audit',   iconKey: 'history'   },
+          { label: 'Admin Hub',           route: '/admin/dashboard',  iconKey: 'admin'     },
+          { label: 'Analytics Center',    route: '/dashboard',        iconKey: 'dashboard' },
+          { label: 'AI Data Explorer',    route: '/chat',             iconKey: 'chat'      },
+          { label: 'Order Management',    route: '/admin/orders',     iconKey: 'orders'    },
+          { label: 'Product Catalog',     route: '/admin/products',   iconKey: 'products'  },
+          { label: 'Category Settings',   route: '/admin/categories', iconKey: 'categories' },
+          { label: 'Review Moderation',   route: '/admin/reviews',    iconKey: 'star'      },
+          { label: 'User Management',     route: '/admin/users',      iconKey: 'users'     },
+          { label: 'Store Approvals',     route: '/admin/stores',     iconKey: 'stores'    },
+          { label: 'System Audit Logs',   route: '/admin/audit',      iconKey: 'history'   },
         ];
         break;
       case 'CORPORATE':
         this.navItems = [
-          { label: 'Store Dashboard',   route: '/admin/dashboard', iconKey: 'dashboard' },
-          { label: 'AI Data Explorer',  route: '/chat',            iconKey: 'chat'      },
-          { label: 'Manage Orders',     route: '/admin/orders',    iconKey: 'orders'    },
-          { label: 'Manage Products',   route: '/admin/products',  iconKey: 'products'  },
+          { label: 'Store Dashboard',     route: '/admin/dashboard',  iconKey: 'dashboard' },
+          { label: 'AI Data Explorer',    route: '/chat',             iconKey: 'chat'      },
+          { label: 'Manage Orders',       route: '/admin/orders',     iconKey: 'orders'    },
+          { label: 'Manage Products',     route: '/admin/products',   iconKey: 'products'  },
+          { label: 'Manage Reviews',      route: '/admin/reviews',    iconKey: 'star'      },
         ];
         break;
       default: // INDIVIDUAL
         this.navItems = [
-          { label: 'Browse Products', route: '/products',       iconKey: 'products' },
-          { label: 'My Analytics',    route: '/my-dashboard',   iconKey: 'dashboard' },
-          { label: 'My Cart',         route: '/cart',           iconKey: 'cart'     },
-          { label: 'My Orders',       route: '/order-history',  iconKey: 'history'  },
-          { label: 'AI Assistant',    route: '/chat',           iconKey: 'chat'     },
+          { label: 'Browse Products',     route: '/products',         iconKey: 'products'  },
+          { label: 'My Analytics',        route: '/my-dashboard',     iconKey: 'dashboard' },
+          { label: 'My Cart',             route: '/cart',             iconKey: 'cart'      },
+          { label: 'My Orders',           route: '/order-history',    iconKey: 'history'   },
+          { label: 'AI Assistant',        route: '/chat',             iconKey: 'chat'      },
         ];
     }
   }
@@ -3059,10 +3322,11 @@ export class IndividualDashboard implements OnInit {
   }
 
   fetchOrders() {
-    this.http.get<any[]>(`/api/orders/user/${this.userId}`).subscribe({
+    this.http.get<any>(`/api/orders/user/${this.userId}`).subscribe({
       next: (data) => {
         this.zone.run(() => {
-          this.orders = data;
+          // Handle both simple list and Page object
+          this.orders = Array.isArray(data) ? data : (data.content || []);
           this.calculateStats();
           this.loading = false;
           this.cdr.detectChanges();
@@ -3087,8 +3351,10 @@ export class IndividualDashboard implements OnInit {
     for (const order of this.orders) {
       if (order.items) {
         for (const item of order.items) {
-          this.totalSpent += (item.unitPrice * item.quantity);
-          this.totalItems += item.quantity;
+          const price = Number(item.unitPrice) || 0;
+          const quantity = Number(item.quantity) || 0;
+          this.totalSpent += (price * quantity);
+          this.totalItems += quantity;
         }
       }
     }
@@ -3402,6 +3668,412 @@ export class AdminCategories implements OnInit {
   }
 }
 
+--- FILE: ./src/app/profile/profile.ts ---
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
+import { Router, RouterModule } from '@angular/router';
+import { AuthService } from '../services/auth';
+
+@Component({
+  selector: 'app-profile',
+  standalone: true,
+  imports: [CommonModule, FormsModule, RouterModule],
+  templateUrl: './profile.html',
+  styleUrls: ['./profile.css']
+})
+export class ProfileComponent implements OnInit {
+  profile: any = {};
+  userId: number = 0;
+  loading: boolean = true;
+  saving: boolean = false;
+  successMessage: string = '';
+
+  constructor(
+    private http: HttpClient,
+    private authService: AuthService,
+    private router: Router,
+    private cdr: ChangeDetectorRef
+  ) {}
+
+  ngOnInit() {
+    this.userId = this.authService.getUserId();
+    if (!this.userId) {
+      this.router.navigate(['/login']);
+      return;
+    }
+    this.loadProfile();
+  }
+
+  loadProfile() {
+    this.http.get<any>(`/api/profiles/user/${this.userId}`).subscribe({
+      next: (data) => {
+        this.profile = data || {};
+        this.loading = false;
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.error('Error loading profile', err);
+        this.loading = false;
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  saveProfile() {
+    this.saving = true;
+    this.http.put<any>(`/api/profiles/user/${this.userId}`, this.profile).subscribe({
+      next: (data) => {
+        this.profile = data;
+        this.saving = false;
+        this.successMessage = 'Profile updated successfully!';
+        this.cdr.detectChanges();
+        
+        setTimeout(() => {
+          this.successMessage = '';
+          this.cdr.detectChanges();
+        }, 3000);
+      },
+      error: (err) => {
+        console.error('Error saving profile', err);
+        this.saving = false;
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  logout() {
+    this.authService.logout();
+  }
+}
+
+--- FILE: ./src/app/profile/profile.html ---
+<div class="flex h-screen bg-gray-100">
+  <div class="w-64 bg-white shadow-md">
+    <div class="p-6">
+      <h2 class="text-2xl font-bold text-gray-800">E-Commerce</h2>
+    </div>
+    <nav class="mt-6">
+      <a routerLink="/products" class="block px-6 py-3 text-gray-600 hover:bg-indigo-50 hover:text-indigo-600">Products</a>
+      <a routerLink="/cart" class="block px-6 py-3 text-gray-600 hover:bg-indigo-50 hover:text-indigo-600">Cart</a>
+      <a routerLink="/order-history" class="block px-6 py-3 text-gray-600 hover:bg-indigo-50 hover:text-indigo-600">Orders</a>
+      <a routerLink="/profile" class="block px-6 py-3 text-indigo-600 bg-indigo-50 border-r-4 border-indigo-600">Profile</a>
+      <a routerLink="/chat" class="block px-6 py-3 text-gray-600 hover:bg-indigo-50 hover:text-indigo-600">AI Assistant</a>
+      <button (click)="logout()" class="w-full text-left block px-6 py-3 text-red-600 hover:bg-red-50">Logout</button>
+    </nav>
+  </div>
+
+  <div class="flex-1 overflow-y-auto w-full max-w-4xl mx-auto py-10 px-4 sm:px-6 lg:px-8">
+    <div *ngIf="loading" class="flex justify-center items-center h-64">
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+    </div>
+    
+    <div *ngIf="!loading">
+      <h1 class="text-2xl font-bold text-gray-900 mb-6">Profile Settings</h1>
+      
+      <div *ngIf="successMessage" class="mb-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded">
+        {{ successMessage }}
+      </div>
+
+      <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+        <form (ngSubmit)="saveProfile()" #profileForm="ngForm">
+          <div class="px-4 py-5 sm:p-6">
+            <div class="grid grid-cols-6 gap-6">
+              
+              <div class="col-span-6 sm:col-span-3">
+                <label class="block text-sm font-medium text-gray-700">Gender</label>
+                <select name="gender" [(ngModel)]="profile.gender" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                  <option value="">Prefer not to say</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div class="col-span-6 sm:col-span-3">
+                <label class="block text-sm font-medium text-gray-700">Age</label>
+                <input type="number" name="age" [(ngModel)]="profile.age" class="mt-1 flex w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-2">
+              </div>
+
+              <div class="col-span-6 sm:col-span-6">
+                <label class="block text-sm font-medium text-gray-700">City</label>
+                <input type="text" name="city" [(ngModel)]="profile.city" class="mt-1 flex w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-2">
+              </div>
+
+            </div>
+
+            <!-- Stats Read-only section -->
+            <div class="mt-8 border-t border-gray-200 pt-6">
+              <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Account Stats</h3>
+              <dl class="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2">
+                <div class="sm:col-span-1">
+                  <dt class="text-sm font-medium text-gray-500">Membership Type</dt>
+                  <dd class="mt-1 text-sm text-gray-900 font-semibold">{{profile.membershipType || 'Standard'}}</dd>
+                </div>
+                <div class="sm:col-span-1">
+                  <dt class="text-sm font-medium text-gray-500">Items Purchased</dt>
+                  <dd class="mt-1 text-sm text-gray-900">{{profile.itemsPurchased || 0}}</dd>
+                </div>
+                <div class="sm:col-span-1">
+                  <dt class="text-sm font-medium text-gray-500">Total Spend</dt>
+                  <dd class="mt-1 text-sm text-gray-900">${{profile.totalSpend || 0}}</dd>
+                </div>
+                <div class="sm:col-span-1">
+                  <dt class="text-sm font-medium text-gray-500">Average Rating Given</dt>
+                  <dd class="mt-1 text-sm text-gray-900">{{profile.avgRating || 0}} ⭐️</dd>
+                </div>
+              </dl>
+            </div>
+            
+          </div>
+          <div class="px-4 py-3 bg-gray-50 text-right sm:px-6">
+            <button type="submit" [disabled]="saving" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50">
+              <span *ngIf="!saving">Save</span>
+              <span *ngIf="saving">Saving...</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+--- FILE: ./src/app/profile/profile.css ---
+/* Profile Component Styles */
+
+--- FILE: ./src/app/admin-reviews/admin-reviews.ts ---
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
+import { FormsModule } from '@angular/forms';
+import { AuthService } from '../services/auth';
+
+@Component({
+  selector: 'app-admin-reviews',
+  standalone: true,
+  imports: [CommonModule, FormsModule],
+  templateUrl: './admin-reviews.html'
+})
+export class AdminReviews implements OnInit {
+  reviews: any[] = [];
+  loading: boolean = true;
+  responseInputs: { [key: number]: string } = {};
+  
+  userRole = '';
+  userId = 0;
+
+  // Pagination
+  currentPage = 0;
+  totalPages = 0;
+  pageSize = 10;
+  totalElements = 0;
+
+  constructor(
+    private http: HttpClient,
+    private cdr: ChangeDetectorRef,
+    private authService: AuthService
+  ) {}
+
+  ngOnInit() {
+    this.userRole = this.authService.getUserRole();
+    this.userId = this.authService.getUserId();
+    this.fetchReviews();
+  }
+
+  fetchReviews(page: number = 0) {
+    this.loading = true;
+    this.currentPage = page;
+    this.cdr.detectChanges();
+
+    let endpoint = this.userRole === 'CORPORATE' 
+      ? `/api/reviews/corporate/${this.userId}`
+      : '/api/reviews';
+
+    this.http.get<any>(endpoint, {
+      params: {
+        page: page.toString(),
+        size: this.pageSize.toString(),
+        sort: 'createdAt,desc'
+      }
+    }).subscribe({
+      next: (data) => {
+        console.log('Reviews API Response:', data);
+        if (data && data.content) {
+          this.reviews = data.content;
+          this.totalPages = data.totalPages;
+          this.totalElements = data.totalElements;
+        } else if (Array.isArray(data)) {
+          this.reviews = data;
+          this.totalPages = 1;
+          this.totalElements = data.length;
+        } else {
+          this.reviews = [];
+          this.totalPages = 1;
+          this.totalElements = 0;
+        }
+        this.loading = false;
+        this.cdr.detectChanges();
+        console.log('Processed Reviews for UI:', this.reviews);
+      },
+      error: (err) => {
+        console.error('Failed to fetch reviews', err);
+        this.loading = false;
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  changePage(page: number) {
+    if (page >= 0 && page < this.totalPages) {
+      this.fetchReviews(page);
+    }
+  }
+
+  updateStatus(id: number, status: string) {
+    this.http.patch(`/api/reviews/${id}/status?status=${status}`, {}).subscribe({
+      next: () => {
+        const review = this.reviews.find(r => r.id === id);
+        if (review) review.status = status;
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.error('Failed to update status', err);
+        alert('Failed to update status');
+      }
+    });
+  }
+
+  submitResponse(id: number) {
+    const response = this.responseInputs[id];
+    if (!response || !response.trim()) return;
+
+    this.http.post(`/api/reviews/${id}/respond`, response).subscribe({
+      next: (updatedReview: any) => {
+        const idx = this.reviews.findIndex(r => r.id === id);
+        if (idx !== -1) {
+          this.reviews[idx] = updatedReview;
+          this.responseInputs[id] = '';
+        }
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.error('Failed to submit response', err);
+        alert('Failed to submit response');
+      }
+    });
+  }
+}
+
+
+--- FILE: ./src/app/admin-reviews/admin-reviews.html ---
+<div class="flex flex-col h-full overflow-hidden bg-slate-900/40">
+  <header class="h-14 glass-panel border-b border-white/5 flex items-center justify-between px-6 shrink-0 sticky top-0 z-10">
+    <h1 class="text-base font-semibold text-white flex items-center gap-2">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+      Review Moderation
+    </h1>
+    <span class="text-sm text-slate-400">{{ totalElements }} total reviews</span>
+  </header>
+
+  <div class="p-6 overflow-y-auto flex-1">
+    <div *ngIf="loading" class="flex flex-col items-center justify-center py-20 text-indigo-400">
+      <div class="w-10 h-10 rounded-full border-4 border-indigo-500/30 border-t-indigo-500 animate-spin mb-4"></div>
+      Loading reviews...
+    </div>
+
+    <div *ngIf="!loading && reviews.length === 0" class="text-center py-20 text-slate-500">
+      No reviews found.
+    </div>
+
+    <div *ngIf="!loading && reviews.length > 0" class="space-y-4">
+      <div *ngFor="let review of reviews" class="glass-card rounded-2xl border border-white/5 p-6 hover:border-indigo-500/20 transition-all">
+        <!-- Review content (unchanged) -->
+        <div class="flex items-start justify-between gap-4">
+          <div class="flex-1">
+            <div class="flex items-center gap-3 mb-2">
+              <div class="flex items-center gap-0.5">
+                <svg *ngFor="let i of [1,2,3,4,5]" width="14" height="14" viewBox="0 0 24 24" 
+                     [attr.fill]="i <= review.rating ? '#fbbf24' : 'none'" 
+                     [attr.stroke]="i <= review.rating ? '#fbbf24' : '#475569'" stroke-width="2">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                </svg>
+              </div>
+              <span class="text-xs text-slate-500 font-medium">Review #{{ review.id }}</span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
+                    [ngClass]="{
+                      'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20': review.status === 'PENDING',
+                      'bg-green-500/10 text-green-400 border border-green-500/20': review.status === 'APPROVED',
+                      'bg-red-500/10 text-red-400 border border-red-500/20': review.status === 'REJECTED'
+                    }">
+                {{ review.status }}
+              </span>
+            </div>
+            
+            <p class="text-sm text-slate-200 leading-relaxed mb-3">"{{ review.comment }}"</p>
+
+            <div *ngIf="review.response" class="mt-4 p-4 bg-indigo-500/10 border-l-4 border-indigo-500 rounded-r-xl">
+              <p class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1">Official Response</p>
+              <p class="text-sm text-slate-300 italic">"{{ review.response }}"</p>
+            </div>
+
+            <div *ngIf="!review.response && review.status === 'APPROVED'" class="mt-4 flex flex-col gap-2">
+              <textarea [(ngModel)]="responseInputs[review.id]" 
+                        placeholder="Write a response..." 
+                        class="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm text-white focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 placeholder:text-slate-600 h-20"></textarea>
+              <button (click)="submitResponse(review.id)" 
+                      class="self-end px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-xs font-bold transition-all shadow-lg shadow-indigo-500/20">
+                Submit Response
+              </button>
+            </div>
+            
+            <div class="flex items-center gap-4 text-[11px] text-slate-500 mt-4">
+              <span class="flex items-center gap-1">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                User #{{ review.userId }}
+              </span>
+              <span class="flex items-center gap-1">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                Product #{{ review.productId }}
+              </span>
+              <span>{{ review.createdAt | date:'MMM d, y, HH:mm' }}</span>
+            </div>
+          </div>
+          
+          <div class="flex flex-col gap-2 shrink-0">
+            <button *ngIf="review.status !== 'APPROVED'" (click)="updateStatus(review.id, 'APPROVED')"
+                    class="px-4 py-2 rounded-xl bg-green-500/10 hover:bg-green-500 text-green-400 hover:text-white border border-green-500/20 transition-all text-xs font-bold">
+              Approve
+            </button>
+            <button *ngIf="review.status !== 'REJECTED'" (click)="updateStatus(review.id, 'REJECTED')"
+                    class="px-4 py-2 rounded-xl bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white border border-red-500/20 transition-all text-xs font-bold">
+              Reject
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pagination Controls -->
+      <div class="flex items-center justify-between pt-6 border-t border-white/5">
+        <p class="text-xs text-slate-500">
+          Showing page {{ currentPage + 1 }} of {{ totalPages }} ({{ totalElements }} reviews)
+        </p>
+        <div class="flex gap-2">
+          <button (click)="changePage(currentPage - 1)" [disabled]="currentPage === 0"
+                  class="px-3 py-1.5 rounded-lg border border-white/5 text-xs font-medium text-slate-400 hover:bg-white/5 disabled:opacity-30 transition-all">
+            Previous
+          </button>
+          <button (click)="changePage(currentPage + 1)" [disabled]="currentPage >= totalPages - 1"
+                  class="px-3 py-1.5 rounded-lg border border-white/5 text-xs font-medium text-slate-400 hover:bg-white/5 disabled:opacity-30 transition-all">
+            Next
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
 --- FILE: ./src/plotly.d.ts ---
 declare module 'plotly.js-dist-min' {
     const Plotly: any;
@@ -3505,6 +4177,7 @@ declare module 'plotly.js-dist-min' {
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "./out-tsc/app",
+    "rootDir": "./src",
     "types": []
   },
   "include": [

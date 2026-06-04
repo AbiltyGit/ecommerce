@@ -36,36 +36,48 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public OrderResponse createOrder(OrderRequest request) {
+        if (request.items() == null || request.items().isEmpty()) {
+            throw new BadRequestException("Order must have at least one item");
+        }
+        
         User user = userRepository.findById(request.userId()).orElseThrow(() -> new ResourceNotFoundException("User not found"));
         
         Order order = new Order();
         order.setUser(user);
         order.setPaymentMethod(request.paymentMethod());
-        order.setShippingAddress(request.shippingAddress()); // Adres eklendi
-        order.setBillingAddress(request.billingAddress());   // Adres eklendi
+        order.setShippingAddress(request.shippingAddress());
+        order.setBillingAddress(request.billingAddress());
         order.setStatus(OrderStatus.PENDING);
         
         java.math.BigDecimal totalAmount = java.math.BigDecimal.ZERO;
         List<OrderItem> items = new ArrayList<>();
         
         for(OrderItemRequest itemReq : request.items()) {
+            if (itemReq.productId() == null || itemReq.quantity() == null || itemReq.quantity() <= 0) {
+                throw new BadRequestException("Invalid item data: productId and quantity > 0 are required");
+            }
+            
             Product product = productRepository.findById(itemReq.productId()).orElseThrow(() -> new ResourceNotFoundException("Product not found"));
-            if(product.getStockQuantity() < itemReq.quantity()) {
+            
+            if(product.getStockQuantity() != null && product.getStockQuantity() < itemReq.quantity()) {
                 throw new BadRequestException("Not enough stock for product: " + product.getName());
             }
             
-            product.setStockQuantity(product.getStockQuantity() - itemReq.quantity());
-            productRepository.save(product);
+            if (product.getStockQuantity() != null) {
+                product.setStockQuantity(product.getStockQuantity() - itemReq.quantity());
+                productRepository.save(product);
+            }
             
             OrderItem item = new OrderItem();
             item.setOrder(order);
             item.setProduct(product);
             item.setQuantity(itemReq.quantity());
-            item.setUnitPrice(product.getPrice());
+            
+            java.math.BigDecimal unitPrice = product.getPrice() != null ? product.getPrice() : java.math.BigDecimal.ZERO;
+            item.setUnitPrice(unitPrice);
             items.add(item);
             
-            // Fiyat hesaplaması
-            totalAmount = totalAmount.add(product.getPrice().multiply(java.math.BigDecimal.valueOf(itemReq.quantity())));
+            totalAmount = totalAmount.add(unitPrice.multiply(java.math.BigDecimal.valueOf(itemReq.quantity())));
         }
         order.setTotalAmount(totalAmount);
         order.setItems(items);

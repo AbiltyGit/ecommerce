@@ -6,7 +6,7 @@ import sys
 
 # Add parent dir to path so configs can be imported
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from configs import AGENT_CONFIGS
+from configs import AGENT_CONFIGS, MODEL_NAME
 
 
 def guardrails_node(state):
@@ -16,7 +16,7 @@ def guardrails_node(state):
         return state
 
     try:
-        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+        llm = ChatOpenAI(model=MODEL_NAME, temperature=0)
         prompt = AGENT_CONFIGS["guardrails_agent"]["system_prompt"]
 
         question = state.get("question", "")

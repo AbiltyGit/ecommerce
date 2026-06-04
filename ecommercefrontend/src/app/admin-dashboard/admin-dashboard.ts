@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
@@ -18,15 +18,23 @@ export class AdminDashboard implements OnInit {
   constructor(
     private http: HttpClient,
     private router: Router,
-    private authService: AuthService
+    private authService: AuthService,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit() {
+    this.loading = true;
+    this.cdr.detectChanges();
     this.http.get('/api/dashboard/stats').subscribe({
-      next: (data) => { this.stats = data; this.loading = false; },
+      next: (data) => { 
+        this.stats = data; 
+        this.loading = false; 
+        this.cdr.detectChanges();
+      },
       error: (err) => {
         this.error = 'Failed to load dashboard stats.';
         this.loading = false;
+        this.cdr.detectChanges();
         console.error(err);
       }
     });

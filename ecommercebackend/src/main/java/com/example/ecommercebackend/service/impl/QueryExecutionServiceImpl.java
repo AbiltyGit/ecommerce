@@ -11,6 +11,7 @@ import net.sf.jsqlparser.statement.select.Select;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import net.sf.jsqlparser.util.TablesNamesFinder;
 
 import java.util.List;
 import java.util.Map;
@@ -38,7 +39,7 @@ public class QueryExecutionServiceImpl implements QueryExecutionService {
      */
     @Override
     @Transactional(readOnly = true)
-    public List<Map<String, Object>> executeReadOnlyQuery(String sql) {
+    public List<Map<String, Object>> executeReadOnlyQuery(String sql, Long currentUserId, String currentUserRole) {
         if (sql == null || sql.trim().isEmpty()) {
             throw new BadRequestException("SQL query cannot be empty or null.");
         }
@@ -53,6 +54,64 @@ public class QueryExecutionServiceImpl implements QueryExecutionService {
             }
 
             Select selectStatement = (Select) statement;
+
+            // --- TASK 2: Implement AST Table Extraction & System Table Deny-List ---
+            TablesNamesFinder tablesNamesFinder = new TablesNamesFinder();
+            List<String> tableList = tablesNamesFinder.getTableList(selectStatement);
+            List<String> systemTables = List.of("users", "refresh_tokens", "audit_logs", "customer_profiles", "carts");
+            
+            for (String table : tableList) {
+                if (systemTables.contains(table.toLowerCase())) {
+                    throw new BadRequestException("Security Violation: Access to system tables via AI is strictly prohibited.");
+                }
+            }
+
+            // --- TASK 3 & 4: Enforce Tenant Isolation ---
+            String sqlUpper = sql.toUpperCase().replaceAll("\\s+", " ");
+            
+            // Task 3: INDIVIDUAL Users
+            if ("INDIVIDUAL".equalsIgnoreCase(currentUserRole)) {
+                List<String> restrictedTables = List.of("orders", "reviews", "order_items", "shipments");
+                boolean accessesRestrictedTable = tableList.stream().anyMatch(t -> restrictedTables.contains(t.toLowerCase()));
+                
+                if (accessesRestrictedTable) {
+                    // Check for USER_ID = {id} with flexibility for spaces and aliases (e.g. O.USER_ID=5 or USER_ID = 5)
+                    String pattern1 = "USER_ID=" + currentUserId;
+                    String pattern2 = "USER_ID = " + currentUserId;
+                    String pattern3 = "USER_ID= " + currentUserId;
+                    String pattern4 = "USER_ID =" + currentUserId;
+
+                    if (!(sqlUpper.contains(pattern1) || sqlUpper.contains(pattern2) || 
+                          sqlUpper.contains(pattern3) || sqlUpper.contains(pattern4))) {
+                        throw new BadRequestException("Security Violation: You can only query your own data. Strict tenant filter 'USER_ID = " + currentUserId + "' is missing for restricted tables: " + tableList);
+                    }
+                    if (sqlUpper.contains(" OR ")) {
+                        throw new BadRequestException("Security Violation: 'OR' bypass detected. Use 'AND' or 'IN' for multiple conditions.");
+                    }
+                }
+            }
+            
+            // Task 4: CORPORATE Users
+            if ("CORPORATE".equalsIgnoreCase(currentUserRole)) {
+                List<String> restrictedTables = List.of("orders", "products", "reviews", "stores");
+                boolean accessesRestrictedTable = tableList.stream().anyMatch(t -> restrictedTables.contains(t.toLowerCase()));
+                
+                if (accessesRestrictedTable) {
+                    // Check for CORPORATE_USER_ID = {id} with flexibility
+                    String pattern1 = "CORPORATE_USER_ID=" + currentUserId;
+                    String pattern2 = "CORPORATE_USER_ID = " + currentUserId;
+                    String pattern3 = "CORPORATE_USER_ID= " + currentUserId;
+                    String pattern4 = "CORPORATE_USER_ID =" + currentUserId;
+
+                    if (!(sqlUpper.contains(pattern1) || sqlUpper.contains(pattern2) || 
+                          sqlUpper.contains(pattern3) || sqlUpper.contains(pattern4))) {
+                        throw new BadRequestException("Security Violation: Corporate isolation failed. Missing 'CORPORATE_USER_ID = " + currentUserId + "' filter for tables: " + tableList);
+                    }
+                    if (sqlUpper.contains(" OR ")) {
+                        throw new BadRequestException("Security Violation: 'OR' bypass detected. Corporate isolation requires strict AND filters.");
+                    }
+                }
+            }
 
             // 3. Inject LIMIT 100 to prevent OOM
             if (selectStatement.getSelectBody() instanceof PlainSelect) {
